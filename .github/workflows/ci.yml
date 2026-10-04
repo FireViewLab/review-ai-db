@@ -3,6 +3,8 @@ name: Azure AI Deploy
 on:
   push:
     branches: ["main"]
+  pull_request:
+    branches: ["main"]
 
 permissions:
   contents: read
@@ -29,6 +31,7 @@ jobs:
           DB_PASSWORD: ci-config-only-not-for-deployment
 
   deploy:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: test
     runs-on: ubuntu-latest
     steps:

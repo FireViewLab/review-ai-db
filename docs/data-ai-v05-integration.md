@@ -77,7 +77,8 @@ Data의 결과 DB에 직접 쓰지 않고 결과 JSON을 응답한다. 별도 �
 - RTI는 text/behavior/network=50/30/20의 가용 신호만 합계 1로 재정규화하고 소수점 한 자리로 반올림한다.
 - level은 반올림한 RTI 70 이상 safe, 40 이상 warn, 그 미만 danger다.
 - reasons는 원본 source/code로 `TEXT_*`, `BEHAVIOR_*`, `NETWORK_*`를 만들며 중복 코드를 제거하고 순서를 보존한다.
-  이번 단계에서는 Groq/LLM 자연어 변환을 연결하지 않는다.
+  AI 런타임 통합 단계에서는 Groq/LLM 자연어 변환을 연결하지 않았다.
+  이후 선택적 Groq 후처리 활성화 시 문장으로 바뀔 수 있다. 필드 타입은 list[str]이며 오류 시 코드로 fallback한다.
 - 계산 불가 text_score/behavior_score/network_score는 -1이며 정상 분석 결과다. 요청 오류는 422, 분석·저장 실패는 503이다.
 - 세 신호 모두 -1이면 rti=-1, level=null이다. 점수 필드에는 null을 허용하지 않는다.
 - 응답 review_count는 필수이며 results 길이와 같아야 한다. platform/product_id/review_id와 요청 순서를 보존한다.
@@ -137,7 +138,7 @@ ENABLE_EXPERIMENTAL_COLLECTION=0
 app/services/analysis, app/schemas/analysis와 필요한 integrations 구현이다.
 운영 API/SSE는 공통 services.analysis.analyze_reviews()를 호출한다.
 services/team_analysis는 기존 import 호환용 재노출 모듈로 남기고 과거 normalize 도구는 별도로 보존한다.
-원본 `/analysis/...` API는 이 서버에 새로 등록하지 않는다. KoELECTRA 학습·진단·Groq 연동은 포함하지 않는다.
+원본 `/analysis/...` API는 이 서버에 새로 등록하지 않는다. AI 런타임 통합 단계에는 KoELECTRA 학습·진단·Groq 연동을 포함하지 않았다.
 Google 감성 서비스는 공식 P_text의 점수 대체 경로가 아니다.
 
 ### 현재 로컬 통합 검증 (2026-10-02)
@@ -180,3 +181,22 @@ POST /api/v1/analyze는 **retired legacy endpoint**다. 라우트·Legacy AI Ana
 - POST /api/v1/analyze는 retired legacy endpoint로 404, Legacy AI Analysis 태그 없음.
 - OpenAPI paths는 GET /health와 POST /api/v1/data/analyze 두 개뿐이다 (실험 기능 OFF).
 - 기존 서버·DB 컨테이너는 교체하지 않고 임시 자원으로 검증했다. 이 기록은 Azure 자동 배포 성공의 증거는 아니다.
+
+## 현재 후처리 단계: 선택적 Groq reasons 자연어화
+
+AI의 확정 점수와 사유 코드를 먼저 만든 뒤 운영 분석·저장 계층에서 reasons만 한국어로 풀어 쓴다.
+기본 `ENABLE_GROQ_REASON_NATURALIZATION=0`에서는 외부 요청 없이 기존 코드를 반환한다.
+활성화하더라도 RTI·등급·세 점수·review_count·식별자와 Result Contract v0.5 필드 구조는 그대로다.
+일반 API와 실험 SSE는 같은 후처리를 거쳐 MySQL 저장 결과와 최종 응답을 일치시킨다.
+
+reasons는 활성화/오류/시간 예산에 따라 한국어 문장 또는 코드가 될 수 있고, 한 배치에서 혼합될 수도 있다.
+Data 소비자는 list[str]을 보존하고 모든 문자열을 코드 enum으로만 해석하지 않도록 확인해야 한다.
+과거 저장 JSON은 재번역하지 않는다. 외부 실패 시 점수는 유지하고 해당 리뷰의 원래 코드를 저장·반환한다.
+
+전체 리뷰 본문과 코드만 합성 배치 참조와 함께 Groq에 전송하며 실제 식별자·점수·내부 인증 토큰은 보내지 않는다.
+최대 20건/32 KiB chunk, 순차 처리, 전체 2 * GROQ_TIMEOUT_SECONDS 예산,
+기본 키 대상 오류 시 보조 키 1회 전환으로 요청을 제한한다. 자세한 설정·검증·개인정보 범위는
+[Groq reasons 후처리 문서](groq-reason-naturalization.md)를 따른다.
+
+앞의 327개 통과·모델/DB 실측은 Groq 도입 이전 AI 런타임 검증 기록이다.
+후처리의 실제 외부 모델 문장 품질·키 quota·지원 모델은 별도 실제 키 검증이 필요하다.
