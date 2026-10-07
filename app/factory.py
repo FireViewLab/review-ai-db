@@ -1,6 +1,7 @@
 """결과 저장소와 선택적 크롤러 SSE 연결의 수명을 관리한다."""
 
 import os
+import asyncio
 from contextlib import asynccontextmanager
 from app.repositories.mysql_jobs import MySQLJobStore
 
@@ -11,6 +12,7 @@ from fastapi.responses import RedirectResponse
 
 from app.api.routes import router
 from app.api.data_analysis import router as data_router
+from app.api.data_analysis_stream import router as data_stream_router
 from app.core.internal_auth import load_internal_token
 
 
@@ -24,6 +26,7 @@ def create_app(*, job_store=None) -> FastAPI:
         store = job_store if job_store is not None else MySQLJobStore.from_env()
         store.initialize()
         app.state.job_store = store
+        app.state.analysis_tasks = set()
         crawler = None
         if experimental:
             from app.integrations.crawler_stream import CrawlerStreamClient
@@ -32,6 +35,8 @@ def create_app(*, job_store=None) -> FastAPI:
         try:
             yield
         finally:
+            if app.state.analysis_tasks:
+                await asyncio.gather(*app.state.analysis_tasks, return_exceptions=True)
             if crawler is not None:
                 await crawler.aclose()
 
@@ -42,6 +47,7 @@ def create_app(*, job_store=None) -> FastAPI:
     )
     application.include_router(router)
     application.include_router(data_router)
+    application.include_router(data_stream_router)
     if experimental:
         from app.api.collection import router as collection_router
         application.include_router(collection_router)

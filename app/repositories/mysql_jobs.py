@@ -3,6 +3,7 @@ import json
 import os
 from contextlib import contextmanager
 from uuid import uuid4
+from app.repositories.idempotency import AnalysisClaim, existing_claim, request_hashes
 
 
 class MySQLJobStore:
@@ -48,6 +49,39 @@ class MySQLJobStore:
                 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""")
+            cursor.execute("""CREATE TABLE IF NOT EXISTS ai_analysis_idempotency (
+                key_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin PRIMARY KEY,
+                payload_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+                job_id VARCHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL UNIQUE,
+                metadata_json JSON NOT NULL,
+                created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (job_id) REFERENCES ai_analysis_jobs(job_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""")
+
+    def claim_idempotent(self, key: str, payload: dict, versions: dict) -> AnalysisClaim:
+        import pymysql
+        key_hash, payload_hash = request_hashes(key, payload)
+        job_id = str(uuid4())
+        try:
+            # Both inserts commit together. A losing concurrent insert rolls back its job.
+            with self._connection() as db, db.cursor() as cursor:
+                cursor.execute("INSERT INTO ai_analysis_jobs(job_id,status,request_json) VALUES (%s, 'RUNNING', %s)",
+                               (job_id, json.dumps(payload, ensure_ascii=False)))
+                cursor.execute("""INSERT INTO ai_analysis_idempotency
+                    (key_hash,payload_hash,job_id,metadata_json) VALUES (%s,%s,%s,%s)""",
+                    (key_hash, payload_hash, job_id, json.dumps(versions)))
+        except pymysql.err.IntegrityError as exc:
+            if exc.args[0] != 1062:
+                raise
+            with self._connection() as db, db.cursor() as cursor:
+                cursor.execute("""SELECT i.*, j.status FROM ai_analysis_idempotency i
+                    JOIN ai_analysis_jobs j ON j.job_id=i.job_id WHERE i.key_hash=%s""",
+                    (key_hash,))
+                row = cursor.fetchone()
+            if row is None:
+                raise RuntimeError("Idempotency record unavailable") from None
+            return existing_claim(row, payload_hash)
+        return AnalysisClaim(job_id, True, dict(versions))
 
     def create(self, payload: dict) -> str:
         job_id = str(uuid4())

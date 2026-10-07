@@ -24,6 +24,7 @@ API 계약 확정을 의미하지 않습니다. 세부 동작은 같은 브랜�
 | --- | --- |
 | [프로젝트 README](../README.md) | 기본 분석 API, 로컬 실행, 기능별 상태, 결과 DB 보관 주의사항 |
 | [Data AI v0.5 연동](data-ai-v05-integration.md) | KoELECTRA runtime, -1 결과 계약, 70/40 등급, RTI 재가중, 공유 토큰·HTTPS, 이전 결과와 차이 |
+| [Data POST 분석 SSE](data-analysis-stream.md) | 신규 공식 POST→SSE, 필수 헤더, DB idempotency/replay, 연결 종료·오류·버전·500건 제한 |
 | [AI 통합 준비 상태](integration-preparation.md) | 자체 MySQL 결과 저장, 팀원 코드와의 차이, 실험 SSE, 미구현 복구 기능. 검증·커밋 관련 기록은 작성 시점 기준 |
 | [Azure 배포 안내](azure-ai-deployment.md) | VM·Secrets·외부 모델 읽기 전용 마운트·worker 1 준비. 이번 단계는 로컬 검증이며 실제 배포 없음 |
 | [2차 런타임 통합 검증](validation/review-ai-runtime-integration-20261002.md) | review-ai-new ff3c149와 기존 운영 구조의 통합 결과·근거·배포 전 TODO |
@@ -32,9 +33,9 @@ API 계약 확정을 의미하지 않습니다. 세부 동작은 같은 브랜�
 현재 브랜치의 핵심 구분:
 
 - 기본 분석 API는 입력·결과를 AI 자체 DB에 저장한 뒤 최종 JSON을 반환합니다.
-- 수집/SSE와 결과 조회는 실험 경로이며 기본 비활성화입니다.
+- 외부 수집 SSE 구독과 결과 조회는 실험 경로이며 기본 비활성화입니다. 별도 공식 POST 분석 SSE는 기본 제공됩니다.
 - Redis 기반 Worker는 현재 실행 경로가 아닙니다.
-- 자동 작업 재개·멱등 요청·자동 재전송은 아직 구현되지 않았습니다.
+- 공식 POST SSE는 DB 멱등 요청과 DONE replay를 지원합니다. 미완료 작업 자동 재개·요청 없는 자동 재전송은 제공하지 않습니다.
 - API/SSE는 공통 analyze_reviews()와 결과 serializer를 사용하고 KoELECTRA를 lazy load합니다.
 - 선택적 Groq 후처리는 점수 계산 뒤 reasons만 한국어로 바꿉니다. 기본 OFF이며 외부 오류 시 원래 코드로 fallback합니다.
 - 이 결과 계약은 신규 분석 작업 기준입니다. 기본 OFF인 저장 작업 조회는 과거 JSON을 그대로 반환하며 자동 계약 변환은 하지 않습니다.
