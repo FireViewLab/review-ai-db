@@ -1,6 +1,13 @@
 <!-- v0.5 결과 계약과 Data Swagger를 기준으로 구현한 API·인증·분석 정책을 설명한다. -->
 # Data AI v0.5 연동
 
+## 2026-10-07 추가: Data POST 분석 SSE
+
+기존 JSON API와 아래 과거 통합 기록은 유지한다. 동일 입력·계산·저장 함수를 사용하는
+`POST /api/v1/data/analyze/stream`을 추가했다. DB 커밋 후 리뷰별 result를 전송하며
+DB 기반 Idempotency-Key 재시도/replay를 제공한다. [전체 SSE 계약](data-analysis-stream.md)을 참조한다.
+기존 experimental SSE 구독과는 별도 경로다.
+
 ## 적용 범위
 
 2026-10-02 인수인계 문서와 `FireViewLab/review-ai-new` main(`ff3c149`)의 검증된 런타임을

@@ -82,7 +82,7 @@ def test_default_app_uses_mysql_and_initializes(fake_db, monkeypatch):
     with TestClient(create_app()) as client:
         assert client.app.state.job_store is store
         assert client.get("/health").status_code == 200
-    sql = db.cursor.return_value.__enter__.return_value.execute.call_args.args[0]
+    sql = "\n".join(call.args[0] for call in db.cursor.return_value.__enter__.return_value.execute.call_args_list)
     assert "CREATE TABLE IF NOT EXISTS ai_analysis_jobs" in sql
     assert "InnoDB" in sql
 

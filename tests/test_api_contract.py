@@ -17,7 +17,7 @@ def client(tmp_path, monkeypatch):
 
 def test_production_openapi_contains_only_health_and_data_analysis(client):
     schema = client.get("/openapi.json").json()
-    assert set(schema["paths"]) == {"/health", "/api/v1/data/analyze"}
+    assert set(schema["paths"]) == {"/health", "/api/v1/data/analyze", "/api/v1/data/analyze/stream"}
     assert set(schema["paths"]["/health"]) == {"get"}
     assert set(schema["paths"]["/api/v1/data/analyze"]) == {"post"}
     assert "Legacy AI Analysis" not in str(schema)

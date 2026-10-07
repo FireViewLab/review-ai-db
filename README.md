@@ -5,6 +5,8 @@ Data 서버가 HTTP로 전달한 리뷰를 분석해 JSON을 반환합니다.
 `FireViewLab/review-ai-new` main(`ff3c149`)에서 검증한 KoELECTRA·행동·네트워크 런타임을
 기존 운영 구조에 통합하는 로컬 검증 단계입니다. 공식 분석 경로는 `POST /api/v1/data/analyze`입니다.
 새 연동은 [v0.5 API·인증·계산 정책](docs/data-ai-v05-integration.md)을 먼저 확인하세요.
+Data가 리뷰를 POST하고 리뷰별 SSE를 받는 신규 공식 경로는 `POST /api/v1/data/analyze/stream`입니다.
+[POST→SSE 계약·헤더·DB idempotency·재시도 안내](docs/data-analysis-stream.md)를 참고하세요. 기존 JSON API는 그대로 유지합니다.
 수집/SSE 실험 경로는 기본 비활성화입니다. [통합 상태·미확정 사항](docs/integration-preparation.md)을 먼저 확인하세요.
 검증 결과와 배포 전 TODO는 [2차 런타임 통합 보고서](docs/validation/review-ai-runtime-integration-20261002.md)를 참고하세요.
 
@@ -14,7 +16,8 @@ Data 서버가 HTTP로 전달한 리뷰를 분석해 JSON을 반환합니다.
 | --- | --- |
 | 기본 기능 | 리뷰 배치 분석, AI 자체 DB에 입력·결과 저장, 저장 성공 후 JSON 응답 |
 | 실험 기능 (기본 OFF) | 외부 크롤러 SSE 수신, 수집 진행 알림, 분석 중 heartbeat, 저장 결과 조회 |
-| 미구현 | 프로세스 재시작 후 작업 자동 재개, 멱등 요청, 결과 자동 재전송 |
+| 공식 SSE | Data POST → AI 분석 → DB 커밋 → 리뷰별 SSE, DB idempotency 및 동일 키 DONE replay |
+| 미구현 | 프로세스 재시작 후 미완료 작업 자동 재개, 요청 없는 결과 자동 재전송 |
 | 팀 합의 필요 | HTTPS·실제 이벤트 샘플, 운영 계정·DB 백업·보존 정책 |
 
 기본 API 처리 순서는 **요청 → 입력 저장 → 점수 계산 → 결과 저장 → HTTP 응답**입니다.
