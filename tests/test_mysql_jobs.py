@@ -128,7 +128,7 @@ def test_live_mysql_lifecycle_and_http(monkeypatch):
             }]})
             assert response.status_code == 200
             ids.append(response.headers["X-Analysis-Job-ID"])
-            assert response.json()["results"][0]["rti"] == 87
+            assert response.json()["results"][0]["rti"] == 72
             assert response.json()["results"][0]["behavior_score"] == -1
             assert response.json()["results"][0]["network_score"] == -1
             assert store.get(ids[-1])["result"] == response.json()

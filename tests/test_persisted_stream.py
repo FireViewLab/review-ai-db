@@ -35,7 +35,7 @@ def test_http_result_is_durable(store, monkeypatch):
         saved = SQLiteJobStore(store.path).get(r.headers["X-Analysis-Job-ID"])
         assert saved["status"] == "DONE"
         assert saved["result"] == r.json()
-        assert saved["result"]["results"][0]["rti"] == 87
+        assert saved["result"]["results"][0]["rti"] == 72
         assert client.post("/experimental/analysis/collect/stream").status_code == 404
 
 

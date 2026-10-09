@@ -2,7 +2,7 @@
 
 CONTRACT_VERSION = "v0.5"
 MODEL_VERSION = "ptext-koelectra-v1-2epoch-20260929"
-POLICY_VERSION = "rti-v0"
+POLICY_VERSION = "rti-v0.1"
 
 
 def analysis_versions() -> dict[str, str]:

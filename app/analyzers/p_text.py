@@ -11,12 +11,22 @@ from pathlib import Path
 DEFAULT_MODEL_PATH = str(Path(__file__).resolve().parents[2] / "models/ptext-koelectra-v1-2epoch-20260929")
 LOGGER = logging.getLogger(__name__)
 _PREDICTION_LOCK = RLock()
+TEXT_SCORE_TEMPERATURE = 2.0
+
+
+def _temperature_scaled_probability(probability: float) -> float:
+    """Soften score saturation without changing the raw classification probability."""
+    if probability == 0.0 or probability == 1.0:
+        return probability
+    logit = math.log(probability / (1.0 - probability))
+    return 1.0 / (1.0 + math.exp(-logit / TEXT_SCORE_TEMPERATURE))
 
 
 def probability_result(probability: float, threshold: float = .5) -> dict:
     if isinstance(probability, bool) or isinstance(threshold, bool) or not math.isfinite(probability) or not 0 <= probability <= 1 or not 0 <= threshold <= 1:
         raise ValueError("Probability and threshold must be finite values in [0, 1]")
-    return {"text_score": round((1 - probability) * 100), "suspicious_probability": probability,
+    score_probability = _temperature_scaled_probability(probability)
+    return {"text_score": round((1 - score_probability) * 100), "suspicious_probability": probability,
             "predicted_label": "SUSPICIOUS" if probability >= threshold else "NORMAL"}
 
 

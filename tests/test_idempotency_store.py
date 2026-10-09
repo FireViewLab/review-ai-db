@@ -99,6 +99,52 @@ def test_api_persists_and_replays(store, monkeypatch, model_free_prediction):
         assert [name for name, _ in decode(replay.text)] == ["meta", "result", "done"]
 
 
+def test_old_policy_replay_preserves_scores_and_versions(store, monkeypatch, model_free_prediction):
+    from fastapi.testclient import TestClient
+    from unittest.mock import Mock
+    from app.contracts.data_ai_v05 import DataAnalyzeRequestV05
+    from app.factory import create_app
+    from tests.test_data_analysis_stream import decode
+    from tests.test_data_ai_v05 import payload
+
+    db, keys = store
+    monkeypatch.setenv("PYTHON_DOTENV_DISABLED", "1")
+    monkeypatch.setenv("ENABLE_EXPERIMENTAL_COLLECTION", "0")
+    monkeypatch.setenv("ENABLE_GROQ_REASON_NATURALIZATION", "0")
+    monkeypatch.setenv("REQUIRE_INTERNAL_TOKEN", "0")
+    monkeypatch.delenv("INTERNAL_TOKEN", raising=False)
+    body = payload()
+    key = new_key(keys)
+    old_versions = {**analysis_versions(), "policy_version": "rti-v0"}
+    old = db.claim_idempotent(key, DataAnalyzeRequestV05.model_validate(body).model_dump(mode="json"), old_versions)
+    old_result = dict(platform=body["platform"], product_id=body["product_id"], review_count=1,
+                      results=[dict(review_id=body["reviews"][0]["review_id"], rti=87.0,
+                                    text_score=87.0, behavior_score=-1.0, network_score=-1.0,
+                                    level="safe", reasons=[])])
+    db.complete(old.job_id, old_result)
+    with TestClient(create_app(job_store=db)) as client:
+        with monkeypatch.context() as replay_patch:
+            forbidden = Mock(side_effect=AssertionError("Old DONE must never reanalyze"))
+            replay_patch.setattr("app.services.data_analysis_stream.evaluate_data_and_store", forbidden)
+            response = client.post("/api/v1/data/analyze/stream", json=body,
+                                   headers={"X-Request-ID": "old-retry", "Idempotency-Key": key})
+            assert response.status_code == 200
+            events = decode(response.text)
+            assert [name for name, _ in events] == ["meta", "result", "done"]
+            assert {k: events[0][1][k] for k in old_versions} == old_versions
+            assert events[1][1] == {"request_id": "old-retry", **old_result["results"][0]}
+            assert db.get(old.job_id)["result"] == old_result
+            forbidden.assert_not_called()
+        new_response = client.post("/api/v1/data/analyze/stream", json=body,
+                                   headers={"X-Request-ID": "new-policy", "Idempotency-Key": new_key(keys)})
+        events = decode(new_response.text)
+        assert events[0][1]["policy_version"] == "rti-v0.1"
+        new_result = next(data for name, data in events if name == "result")
+        assert new_result["text_score"] == new_result["rti"] == 72.0
+        assert events[-1][0] == "done"
+        assert db.get(old.job_id)["result"] == old_result
+
+
 def test_concurrent_claim_exactly_one_winner(store):
     db, keys = store
     key = new_key(keys)

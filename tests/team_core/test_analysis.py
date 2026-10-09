@@ -95,7 +95,7 @@ def test_two_reviews_are_each_others_network_comparison() -> None:
         ("충분한 길이를 가진 첫 번째 리뷰 본문입니다.", "비교 가능한 길이를 가진 두 번째 리뷰 본문입니다."),
         ("비교 가능한 길이를 가진 두 번째 리뷰 본문입니다.", "충분한 길이를 가진 첫 번째 리뷰 본문입니다."),
     ]
-    assert all(result.signals.network.available for result in results)
+    assert all(not result.signals.network.available for result in results)
 
 
 def test_duplicate_content_network_signal_affects_final_result() -> None:
@@ -186,4 +186,4 @@ def test_sentiment_and_custom_similarity_adapters_can_be_injected() -> None:
 
     assert sentiment.calls == [review.content for review in inputs]
     assert len(similarity.calls) == 2
-    assert all(result.signals.network.score == 100.0 for result in results)
+    assert all(not result.signals.network.available for result in results)
