@@ -129,7 +129,7 @@ def main() -> None:
 
             expected, seconds = timed(lambda: analyze_reviews(**payload))
             assert expected["review_count"] == 3
-            assert all(result["text_score"] != -1 and result["network_score"] != -1
+            assert all(result["text_score"] != -1 and result["network_score"] == -1
                        and result["behavior_score"] == -1 for result in expected["results"])
             report["analysis_3"] = {"seconds": seconds, "result": expected}
             report["memory"]["after_3_reviews"] = memory_snapshot()
@@ -183,6 +183,37 @@ def main() -> None:
             report["normal_api"] = {"seconds": seconds, "status_code": normal.status_code,
                                      "mysql_result_matches": True}
 
+            from uuid import uuid4
+            from unittest.mock import patch
+            from app.core.analysis_versions import analysis_versions
+
+            stream_headers = {**headers, "X-Request-ID": "policy-smoke",
+                              "Idempotency-Key": "policy-smoke-" + str(uuid4())}
+            official, seconds = timed(lambda: client.post(
+                "/api/v1/data/analyze/stream", json=payload, headers=stream_headers))
+            assert official.status_code == 200
+            job_ids.append(official.headers["X-Analysis-Job-ID"])
+            events = [(frame.event, json.loads(frame.data))
+                      for frame in iter_sse_frames(official.text.splitlines())]
+            assert {key: events[0][1][key] for key in analysis_versions()} == analysis_versions()
+            wire_results = [{key: value for key, value in data.items() if key != "request_id"}
+                            for name, data in events if name == "result"]
+            assert wire_results == expected["results"]
+            assert events[-1][0] == "done" and events[-1][1]["result_count"] == 3
+            assert store.get(job_ids[-1])["result"] == expected
+            with patch("app.services.data_analysis_stream.evaluate_data_and_store",
+                       side_effect=AssertionError("Replay must not infer")) as forbidden:
+                replay, replay_seconds = timed(lambda: client.post(
+                    "/api/v1/data/analyze/stream", json=payload, headers=stream_headers))
+                assert replay.status_code == 200
+                replay_events = [(frame.event, json.loads(frame.data))
+                                 for frame in iter_sse_frames(replay.text.splitlines())]
+                assert replay_events == [event for event in events if event[0] != "progress"]
+                forbidden.assert_not_called()
+            report["official_sse"] = {"seconds": seconds, "replay_seconds": replay_seconds,
+                                      "api_result_identical": True, "mysql_result_matches": True,
+                                      "replay_without_analysis": True, **analysis_versions()}
+
             stream_body = "".join(
                 "event: review\ndata: " + json.dumps({**row, "platform": "mall", "product_id": "0007"}, ensure_ascii=False) + "\n\n"
                 for row in sample_reviews
@@ -231,6 +262,7 @@ def main() -> None:
             report["checks"]["all_passed"] = True
     finally:
         for job_id in job_ids:
+            store._execute("DELETE FROM ai_analysis_idempotency WHERE job_id=%s", (job_id,))
             store._execute("DELETE FROM ai_analysis_jobs WHERE job_id=%s", (job_id,))
     report["cleanup"] = {"own_jobs_removed": len(job_ids)}
     encoded = json.dumps(report, ensure_ascii=False, indent=2)

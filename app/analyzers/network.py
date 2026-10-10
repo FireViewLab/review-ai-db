@@ -142,6 +142,15 @@ def _from_similarities(similarities):
         compared_review_count=len(similarities),
     )
 
+    if similar_review_count == 0 and features.similarity_max <= SIMILARITY_SCORE_FLOOR:
+        return NetworkAnalysisResult(
+            available=False,
+            p_network=None,
+            features=features,
+            reasons=(),
+            unavailable_reason="no_meaningful_similarity_evidence",
+        )
+
     scale = lambda value: min(1.0, max(0.0, (value - SIMILARITY_SCORE_FLOOR) / 0.50))
     cluster_scale = 1.0 - exp(-similar_review_count / 2.0)
     score = (

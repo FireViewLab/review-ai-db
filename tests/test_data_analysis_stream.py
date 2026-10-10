@@ -38,11 +38,20 @@ def client(tmp_path, monkeypatch):
         yield http, store
 
 
-def test_matches_json_and_commits_before_first_result(client, monkeypatch):
+@pytest.mark.parametrize("duplicate", [True, False])
+def test_matches_json_and_commits_before_first_result(client, monkeypatch, duplicate):
     http, store = client
     body = payload()
     body["reviews"].append({**body["reviews"][0], "review_id": "second"})
+    if not duplicate:
+        body["reviews"][0]["content"] = "이 크림을 한 달 사용하니 세안 후 당김이 줄고 촉촉해서 만족합니다."
+        body["reviews"][1]["content"] = "배송 상자가 찌그러졌고 손잡이 나사가 빠져 반품했습니다."
     baseline = http.post("/api/v1/data/analyze", json=body).json()
+    if not duplicate:
+        assert all(r["network_score"] == -1 and r["rti"] == r["text_score"] == 72
+                   for r in baseline["results"])
+        assert all(not any(reason.startswith("NETWORK_") for reason in r["reasons"])
+                   for r in baseline["results"])
     original_frame = service.frame
     job_ids = []
 
@@ -109,7 +118,7 @@ def test_replay_uses_db_after_app_restart_and_never_analyzes(client, monkeypatch
     events = decode(replay.text)
     assert [name for name, _ in events] == ["meta", "result", "done"]
     assert all(data["request_id"] == "new-attempt" for _, data in events)
-    assert events[0][1]["policy_version"] == "rti-v0"
+    assert events[0][1]["policy_version"] == "rti-v0.1"
     assert events[1][1]["behavior_score"] == -1
     analyzer.assert_not_called()
 

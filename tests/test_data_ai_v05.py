@@ -39,7 +39,7 @@ def test_v05_text_only_and_durable_response(client):
     assert response.status_code == 200
     result = response.json()
     assert result == {"platform": "mall", "product_id": "0007", "review_count": 1, "results": [{
-        "review_id": "00:01", "rti": 87.0, "level": "safe", "text_score": 87.0,
+        "review_id": "00:01", "rti": 72.0, "level": "safe", "text_score": 72.0,
         "behavior_score": -1.0, "network_score": -1.0, "reasons": ["TEXT_SHORT_REVIEW"],
     }]}
     saved = store.get(response.headers["X-Analysis-Job-ID"])
@@ -53,9 +53,9 @@ def test_v05_duplicate_text_and_available_weight_normalization(client):
     result = client[0].post("/api/v1/data/analyze", json=body).json()
     assert [r["review_id"] for r in result["results"]] == ["00:01", "0002"]
     for review in result["results"]:
-        assert review["text_score"] == 87 and review["network_score"] == 9.1
+        assert review["text_score"] == 72 and review["network_score"] == 9.1
         assert review["behavior_score"] == -1
-        assert review["rti"] == round((87 * .5 + review["network_score"] * .2) / .7, 1)
+        assert review["rti"] == round((72 * .5 + review["network_score"] * .2) / .7, 1)
         assert review["level"] == "warn"
         assert review["reasons"] == ["TEXT_SHORT_REVIEW", "NETWORK_SIMILAR_REVIEW_PATTERN"]
 
@@ -65,7 +65,7 @@ def test_unobserved_behavior_is_not_invented(client, field, value):
     body = payload()
     body["reviews"][0][field] = value
     review = client[0].post("/api/v1/data/analyze", json=body).json()["results"][0]
-    assert review["behavior_score"] == -1 and review["rti"] == 87
+    assert review["behavior_score"] == -1 and review["rti"] == 72
 
 
 @pytest.mark.parametrize("kind", ["empty", "duplicate", "numeric_id", "blank_content", "too_many"])

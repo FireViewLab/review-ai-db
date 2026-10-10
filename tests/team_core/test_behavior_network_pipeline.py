@@ -37,7 +37,7 @@ def test_network_near_duplicate_and_unrelated_korean():
     assert results[0].features.similarity_max >= .85
     assert results[0].features.similar_review_count == 1
     assert results[0].p_network == 39.1
-    assert results[2].p_network == 100 and results[2].reasons == ()
+    assert results[2].p_network is None and results[2].reasons == ()
 
 
 @pytest.mark.parametrize("texts", [["리뷰 한 건"], ["", "  "], ["좋", "!"]])
@@ -83,8 +83,8 @@ def test_python_entry_point_contract_and_missing(monkeypatch):
     assert result['review_count'] == len(result['results']) == 2
     assert result['results'][0]['behavior_score'] == 70
     assert result['results'][1]['behavior_score'] == -1
-    assert result['results'][0]['rti'] == 81.0  # text + behavior + network
-    assert result['results'][1]['rti'] == 85.7  # text + network, weights renormalized
+    assert result['results'][0]['rti'] == 76.2  # text + behavior, renormalized
+    assert result['results'][1]['rti'] == 80.0  # text only
     expected_keys = {'review_id','rti','level','text_score','behavior_score','network_score','reasons'}
     for row in result['results']:
         assert set(row) == expected_keys
@@ -154,7 +154,7 @@ def test_python_entry_point_combines_text_behavior_and_network(monkeypatch):
         "NETWORK_SIMILAR_REVIEW_PATTERN",
     }.issubset(similar["reasons"])
     assert unrelated["behavior_score"] == -1.0
-    assert unrelated["network_score"] == 100.0
+    assert unrelated["network_score"] == -1.0
     assert not any(reason.startswith("BEHAVIOR_") or reason.startswith("NETWORK_")
                    for reason in unrelated["reasons"])
     assert result["review_count"] == len(result["results"]) == 3

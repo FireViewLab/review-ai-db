@@ -34,6 +34,25 @@ def test_no_comparison_reviews_is_unavailable() -> None:
     assert result.unavailable_reason == "no_comparison_reviews"
 
 
+@pytest.mark.parametrize("values", [[0.0], [0.2, 0.5]])
+def test_low_similarity_with_valid_comparison_is_unavailable(values):
+    result = _from_similarities(values)
+    assert result.network_score == -1 and not result.available
+    assert result.features.compared_review_count == len(values)
+    assert result.features.similarity_max == max(values)
+    assert result.features.similar_review_count == 0
+    assert result.features.similarity_mean == pytest.approx(sum(values) / len(values))
+    assert result.reasons == ()
+    assert result.unavailable_reason == "no_meaningful_similarity_evidence"
+
+
+def test_similarity_above_score_floor_keeps_continuous_score():
+    result = _from_similarities([0.5001])
+    assert result.available is True
+    assert result.network_score == 100.0  # Existing rounding, not unavailable.
+    assert result.reasons == ()
+
+
 def test_canonical_normalization_does_not_mutate_source() -> None:
     source = " 배송  빠르고 제품도 좋아요!!! "
     assert canonical_text(source) == "배송빠르고제품도좋아요"
@@ -80,7 +99,8 @@ def test_strong_threshold_uses_unrounded_raw_similarity(
 def test_different_reviews_do_not_create_false_positive(left: str, right: str) -> None:
     results = batch(left, right)
     assert results[0].features.similarity_max < 0.85
-    assert results[0].p_network > 90
+    assert results[0].p_network is None
+    assert results[0].unavailable_reason == "no_meaningful_similarity_evidence"
     assert results[0].reasons == ()
 
 

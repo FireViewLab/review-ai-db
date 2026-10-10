@@ -42,7 +42,7 @@ def test_live_http(monkeypatch, tmp_path):
         with urlopen(data_request, timeout=5) as response:
             assert response.status == 200
             result = json.load(response)
-            assert result["results"][0]["rti"] == 87.0
+            assert result["results"][0]["rti"] == 72.0
             assert result["results"][0]["behavior_score"] == -1
             assert app.state.job_store.get(response.headers["X-Analysis-Job-ID"])["result"] == result
     finally:

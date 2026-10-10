@@ -25,6 +25,7 @@ API 계약 확정을 의미하지 않습니다. 세부 동작은 같은 브랜�
 | [프로젝트 README](../README.md) | 기본 분석 API, 로컬 실행, 기능별 상태, 결과 DB 보관 주의사항 |
 | [Data AI v0.5 연동](data-ai-v05-integration.md) | KoELECTRA runtime, -1 결과 계약, 70/40 등급, RTI 재가중, 공유 토큰·HTTPS, 이전 결과와 차이 |
 | [Data POST 분석 SSE](data-analysis-stream.md) | 신규 공식 POST→SSE, 필수 헤더, DB idempotency/replay, 연결 종료·오류·버전·500건 제한 |
+| [RTI rti-v0.1 정책](rti-policy-v01.md) | Text T=2, 낮은 Network 유사도 unavailable, 구 정책 replay 보존, Data 재처리 협의 |
 | [AI 통합 준비 상태](integration-preparation.md) | 자체 MySQL 결과 저장, 팀원 코드와의 차이, 실험 SSE, 미구현 복구 기능. 검증·커밋 관련 기록은 작성 시점 기준 |
 | [Azure 배포 안내](azure-ai-deployment.md) | VM·Secrets·외부 모델 읽기 전용 마운트·worker 1 준비. 이번 단계는 로컬 검증이며 실제 배포 없음 |
 | [2차 런타임 통합 검증](validation/review-ai-runtime-integration-20261002.md) | review-ai-new ff3c149와 기존 운영 구조의 통합 결과·근거·배포 전 TODO |

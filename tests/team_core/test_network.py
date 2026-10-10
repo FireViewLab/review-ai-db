@@ -44,7 +44,7 @@ def test_target_itself_is_excluded() -> None:
         ),
     )
 
-    assert result.available is True
+    assert result.available is False
     assert result.features.compared_review_count == 1
     assert result.features.similar_review_count == 0
 
@@ -66,10 +66,11 @@ def test_no_duplicate_has_zero_count() -> None:
         (review("review-2", "배송이 빠르고 포장이 꼼꼼합니다."),),
     )
 
-    assert result.available is True
+    assert result.available is False
     assert result.features.similar_review_count == 0
     assert result.features.similarity_max < 0.5
-    assert result.p_network == 100.0
+    assert result.p_network is None
+    assert result.unavailable_reason == "no_meaningful_similarity_evidence"
 
 
 def test_compared_review_count_counts_only_similarity_results() -> None:
