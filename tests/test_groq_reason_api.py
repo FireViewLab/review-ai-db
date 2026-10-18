@@ -141,7 +141,7 @@ def test_disabled_naturalization_preserves_original_and_never_requests(api, monk
 def test_auth_and_health_do_not_call_groq_or_model(api, monkeypatch):
     client, store = api
     install_transport(monkeypatch, lambda request: pytest.fail("Auth/health made provider request"))
-    with patch("app.services.analysis.predict_text_score") as model, patch.object(store, "create") as create:
+    with patch("app.services.analysis.predict_text_scores") as model, patch.object(store, "create") as create:
         assert client.get("/health").status_code == 200
         assert client.post("/api/v1/data/analyze", json=body()).status_code == 401
         assert client.post("/experimental/analysis/collect/stream", json={"platform": "mall", "product_id": "0007"}).status_code == 401

@@ -1,0 +1,110 @@
+[
+  {
+    "case_id": "NATURAL_01",
+    "category": "natural_review",
+    "content": "배송받은 뒤 일주일 정도 사용했습니다. 크기가 알맞고 사용법도 어렵지 않았어요.",
+    "purpose": "일반적인 리뷰 입력 parity 확인"
+  },
+  {
+    "case_id": "NATURAL_02",
+    "category": "natural_review",
+    "content": "포장은 단정했고 제품 상태도 괜찮았습니다. 기대했던 기능은 무리 없이 동작합니다.",
+    "purpose": "다른 문장 구성의 일반 리뷰 parity 확인"
+  },
+  {
+    "case_id": "PROMOTIONAL_01",
+    "category": "promotional_expression",
+    "content": "무조건 추천!!! 역대급 품질과 놀라운 혜택, 지금 바로 꼭 써 보세요!!!",
+    "purpose": "과장·홍보성 표현의 모델 출력 보존"
+  },
+  {
+    "case_id": "SHORT_01",
+    "category": "very_short",
+    "content": "좋아요",
+    "purpose": "매우 짧은 유효 문자열 parity 확인"
+  },
+  {
+    "case_id": "LONG_TRUNCATION_01",
+    "category": "long_truncation",
+    "content": "처음 제품을 받아 포장을 확인하고 설명서를 읽은 뒤 매일 아침과 저녁에 사용해 보았습니다. 사용감과 크기와 보관 방법을 차례로 살펴보니 특별히 불편한 점은 없었고 가족과 함께 여러 환경에서 반복해서 확인했습니다. 이 문장은 토크나이저 최대 길이를 넘는 입력에서 단건과 배치의 truncation 동작이 같은지 확인하기 위해 충분히 길게 반복됩니다. 처음 제품을 받아 포장을 확인하고 설명서를 읽은 뒤 매일 아침과 저녁에 사용해 보았습니다. 사용감과 크기와 보관 방법을 차례로 살펴보니 특별히 불편한 점은 없었고 가족과 함께 여러 환경에서 반복해서 확인했습니다. 이 문장은 토크나이저 최대 길이를 넘는 입력에서 단건과 배치의 truncation 동작이 같은지 확인하기 위해 충분히 길게 반복됩니다. 처음 제품을 받아 포장을 확인하고 설명서를 읽은 뒤 매일 아침과 저녁에 사용해 보았습니다. 사용감과 크기와 보관 방법을 차례로 살펴보니 특별히 불편한 점은 없었고 가족과 함께 여러 환경에서 반복해서 확인했습니다. 이 문장은 토크나이저 최대 길이를 넘는 입력에서 단건과 배치의 truncation 동작이 같은지 확인하기 위해 충분히 길게 반복됩니다. 처음 제품을 받아 포장을 확인하고 설명서를 읽은 뒤 매일 아침과 저녁에 사용해 보았습니다. 사용감과 크기와 보관 방법을 차례로 살펴보니 특별히 불편한 점은 없었고 가족과 함께 여러 환경에서 반복해서 확인했습니다. 이 문장은 토크나이저 최대 길이를 넘는 입력에서 단건과 배치의 truncation 동작이 같은지 확인하기 위해 충분히 길게 반복됩니다. 처음 제품을 받아 포장을 확인하고 설명서를 읽은 뒤 매일 아침과 저녁에 사용해 보았습니다. 사용감과 크기와 보관 방법을 차례로 살펴보니 특별히 불편한 점은 없었고 가족과 함께 여러 환경에서 반복해서 확인했습니다. 이 문장은 토크나이저 최대 길이를 넘는 입력에서 단건과 배치의 truncation 동작이 같은지 확인하기 위해 충분히 길게 반복됩니다.",
+    "purpose": "max_length truncation 경계의 parity 확인"
+  },
+  {
+    "case_id": "EMOJI_01",
+    "category": "emoji",
+    "content": "색상이 화면과 비슷하고 마감도 깔끔해요 😊👍",
+    "purpose": "이모지 포함 입력 parity 확인"
+  },
+  {
+    "case_id": "SPECIAL_REPEAT_01",
+    "category": "special_characters",
+    "content": "정말 괜찮은 건가요?!?!?! 가격 대비는 ★★★☆☆ 정도입니다~~~",
+    "purpose": "특수문자와 반복 문장부호 처리 확인"
+  },
+  {
+    "case_id": "MIXED_LANGUAGE_01",
+    "category": "mixed_language_number",
+    "content": "Version 2 제품을 3일 사용했고 battery는 약 8시간 갔습니다.",
+    "purpose": "한글·영어·숫자 혼합 입력 parity 확인"
+  },
+  {
+    "case_id": "MULTILINE_01",
+    "category": "line_break",
+    "content": "장점: 조작이 간단합니다.\n단점: 설명이 조금 부족합니다.\n전체적으로는 보통입니다.",
+    "purpose": "줄바꿈 보존 입력 parity 확인"
+  },
+  {
+    "case_id": "HTML_ENTITY_01",
+    "category": "html_entity",
+    "content": "크기는 A&amp;B 옵션 중 B를 골랐고, 포장에는 &lt;주의&gt; 표시가 있었습니다.",
+    "purpose": "HTML entity 형태 문자열 parity 확인"
+  },
+  {
+    "case_id": "NBSP_01",
+    "category": "space_variant",
+    "content": "재질은\u00a0부드럽고  손잡이는\u00a0\u00a0단단합니다.",
+    "purpose": "NBSP와 연속 공백 포함 입력 parity 확인"
+  },
+  {
+    "case_id": "DUPLICATE_01_A",
+    "category": "duplicate",
+    "content": "같은 문장이 여러 번 들어와도 각각 같은 결과를 반환해야 합니다.",
+    "purpose": "동일 content의 첫 번째 결과 확인"
+  },
+  {
+    "case_id": "DUPLICATE_01_B",
+    "category": "duplicate",
+    "content": "같은 문장이 여러 번 들어와도 각각 같은 결과를 반환해야 합니다.",
+    "purpose": "동일 content의 두 번째 결과 확인"
+  },
+  {
+    "case_id": "MODEL_SUSPICIOUS_01",
+    "category": "model_suspicious",
+    "content": "아직 확인 전이지만 선물할 물건을 찾다가 후보에 넣은 침구입니다. 아직 포장을 열지는 않았지만 별다른 관리 없이도 오래 유지된다는 기대가 생겼어요. 단점이나 불편한 점은 직접 살펴보지 못했습니다. 그래서 비교 중이라면 이쪽을 우선 살펴보세요. 교환 조건: 확인 전.",
+    "purpose": "현재 단건 모델의 확실한 SUSPICIOUS 출력 parity 확인"
+  },
+  {
+    "case_id": "MODEL_SUSPICIOUS_02",
+    "category": "model_suspicious_threshold_edge",
+    "content": "직접 관리하기 편한지 확인한 침구은 소재와 성분, 용량, 마감 품질을 고르게 갖췄으며 촉감 기능을 제공합니다. 배송 후 바로 만족할 선택이라고 생각합니다. 세척 전후 상태도 함께 살펴봤습니다. 추천 여부는 재구매 경험까지 보고 판단했습니다. 하루 31회 조건도 살피며 24일 기준으로 비교했습니다.",
+    "purpose": "제한 후보군에서 threshold 이상 최인접 SUSPICIOUS 출력 parity 확인"
+  },
+  {
+    "case_id": "EMPTY_01",
+    "category": "unavailable",
+    "content": "",
+    "purpose": "빈 문자열 unavailable 처리 확인"
+  },
+  {
+    "case_id": "WHITESPACE_01",
+    "category": "unavailable",
+    "content": "   ",
+    "purpose": "공백 문자열 unavailable 처리 확인"
+  },
+  {
+    "case_id": "NULL_01",
+    "category": "unavailable",
+    "content": null,
+    "purpose": "None 입력 unavailable 처리 확인"
+  }
+]

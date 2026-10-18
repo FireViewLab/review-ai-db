@@ -38,8 +38,8 @@ def test_missing_signal_combinations_across_service_api_and_storage(
     runtime_app, monkeypatch, text, behavior, network,
 ):
     """신호 의존성만 제어하고 실제 RTI·응답 mapper·API·저장 경로를 실행한다."""
-    monkeypatch.setattr("app.services.analysis.predict_text_score",
-                        lambda content: {"text_score": text})
+    monkeypatch.setattr("app.services.analysis.predict_text_scores",
+                        lambda contents: [{"text_score": text} for _ in contents])
     behavior_result = analyze_behavior(BehaviorInput(verified_purchase=False))
     monkeypatch.setattr("app.services.analysis.analyze_behavior", lambda data: replace(
         behavior_result, available=behavior != -1,
@@ -79,8 +79,8 @@ def test_missing_signal_combinations_across_service_api_and_storage(
 
 @pytest.mark.parametrize("text_score", [87, -1])
 def test_api_and_sse_publish_identical_flat_contract(runtime_app, monkeypatch, text_score):
-    monkeypatch.setattr("app.services.analysis.predict_text_score",
-                        lambda content: {"text_score": text_score})
+    monkeypatch.setattr("app.services.analysis.predict_text_scores",
+                        lambda contents: [{"text_score": text_score} for _ in contents])
     http, store = runtime_app
     event = review("00:01").model_copy(update={"product_id": "0007"})
     http.app.state.crawler_stream = FakeCrawler([event, DoneEvent(job_id="up", collected=1)])

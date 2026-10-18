@@ -132,7 +132,7 @@ def test_live_mysql_lifecycle_and_http(monkeypatch):
             assert response.json()["results"][0]["behavior_score"] == -1
             assert response.json()["results"][0]["network_score"] == -1
             assert store.get(ids[-1])["result"] == response.json()
-            monkeypatch.setattr("app.services.analysis.predict_text_score", lambda content: {"text_score": -1})
+            monkeypatch.setattr("app.services.analysis.predict_text_scores", lambda contents: [{"text_score": -1} for _ in contents])
             response = client.post("/api/v1/data/analyze", json={"platform": "test", "product_id": "mysql-missing", "reviews": [{
                 "review_id": "00:01", "content": "누락 신호 검증 😃",
             }]})

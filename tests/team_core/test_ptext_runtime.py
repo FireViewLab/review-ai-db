@@ -125,8 +125,8 @@ def test_count_must_match_results():
 
 @pytest.mark.parametrize('score', [-1, 0, 87])
 def test_service_to_contract_missing_and_zero(monkeypatch, score):
-    predictor = Mock(return_value={'text_score': score})
-    monkeypatch.setattr(analysis, 'predict_text_score', predictor)
+    predictor = Mock(return_value=[{'text_score': score}])
+    monkeypatch.setattr(analysis, 'predict_text_scores', predictor)
     content = 'A sufficiently long neutral review describing my personal experience.'
     result = analysis.analyze_product_reviews('p', [analysis.ReviewAnalysisInput('1', 'p', content)])[0]
     row = to_review_response(result, platform='kurly', review_id='1', product_id='p')
@@ -134,12 +134,12 @@ def test_service_to_contract_missing_and_zero(monkeypatch, score):
     assert row.level == (None if score == -1 else 'danger' if score == 0 else 'safe')
     assert row.reasons == []  # Probability is not evidence of a specific rule.
     assert row.behavior_score == row.network_score == -1
-    predictor.assert_called_once_with(content)
+    predictor.assert_called_once_with([content])
     assert set(row.model_dump()) == {'review_id', 'rti', 'level', 'text_score', 'behavior_score', 'network_score', 'reasons'}
 
 
 def test_empty_text_does_not_create_network_score(monkeypatch):
-    monkeypatch.setattr(analysis, 'predict_text_score', lambda content: p_text.unavailable_result())
+    monkeypatch.setattr(analysis, 'predict_text_scores', lambda contents: [p_text.unavailable_result() for _ in contents])
     rows = analysis.analyze_product_reviews('p', [analysis.ReviewAnalysisInput('1', 'p', ''), analysis.ReviewAnalysisInput('2', 'p', '  ')])
     assert all(row.rti is None and row.level is None for row in rows)
 

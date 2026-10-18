@@ -1,0 +1,110 @@
+[
+  {
+    "case_id": "NATURAL_01",
+    "text_score": 95,
+    "suspicious_probability": 0.002429029904305935,
+    "predicted_label": "NORMAL"
+  },
+  {
+    "case_id": "NATURAL_02",
+    "text_score": 95,
+    "suspicious_probability": 0.0026199277490377426,
+    "predicted_label": "NORMAL"
+  },
+  {
+    "case_id": "PROMOTIONAL_01",
+    "text_score": 95,
+    "suspicious_probability": 0.002455697860568762,
+    "predicted_label": "NORMAL"
+  },
+  {
+    "case_id": "SHORT_01",
+    "text_score": 95,
+    "suspicious_probability": 0.0032263710163533688,
+    "predicted_label": "NORMAL"
+  },
+  {
+    "case_id": "LONG_TRUNCATION_01",
+    "text_score": 90,
+    "suspicious_probability": 0.012578858993947506,
+    "predicted_label": "NORMAL"
+  },
+  {
+    "case_id": "EMOJI_01",
+    "text_score": 95,
+    "suspicious_probability": 0.0022409013472497463,
+    "predicted_label": "NORMAL"
+  },
+  {
+    "case_id": "SPECIAL_REPEAT_01",
+    "text_score": 95,
+    "suspicious_probability": 0.0023244319017976522,
+    "predicted_label": "NORMAL"
+  },
+  {
+    "case_id": "MIXED_LANGUAGE_01",
+    "text_score": 95,
+    "suspicious_probability": 0.00223920657299459,
+    "predicted_label": "NORMAL"
+  },
+  {
+    "case_id": "MULTILINE_01",
+    "text_score": 93,
+    "suspicious_probability": 0.0053892964497208595,
+    "predicted_label": "NORMAL"
+  },
+  {
+    "case_id": "HTML_ENTITY_01",
+    "text_score": 94,
+    "suspicious_probability": 0.003468242473900318,
+    "predicted_label": "NORMAL"
+  },
+  {
+    "case_id": "NBSP_01",
+    "text_score": 95,
+    "suspicious_probability": 0.002861441345885396,
+    "predicted_label": "NORMAL"
+  },
+  {
+    "case_id": "DUPLICATE_01_A",
+    "text_score": 67,
+    "suspicious_probability": 0.1972595900297165,
+    "predicted_label": "NORMAL"
+  },
+  {
+    "case_id": "DUPLICATE_01_B",
+    "text_score": 67,
+    "suspicious_probability": 0.1972595900297165,
+    "predicted_label": "NORMAL"
+  },
+  {
+    "case_id": "MODEL_SUSPICIOUS_01",
+    "text_score": 5,
+    "suspicious_probability": 0.9968300461769104,
+    "predicted_label": "SUSPICIOUS"
+  },
+  {
+    "case_id": "MODEL_SUSPICIOUS_02",
+    "text_score": 45,
+    "suspicious_probability": 0.6044201850891113,
+    "predicted_label": "SUSPICIOUS"
+  },
+  {
+    "case_id": "EMPTY_01",
+    "text_score": -1,
+    "suspicious_probability": null,
+    "predicted_label": null
+  },
+  {
+    "case_id": "WHITESPACE_01",
+    "text_score": -1,
+    "suspicious_probability": null,
+    "predicted_label": null
+  },
+  {
+    "case_id": "NULL_01",
+    "text_score": -1,
+    "suspicious_probability": null,
+    "predicted_label": null
+  }
+]
