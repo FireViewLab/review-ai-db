@@ -7,6 +7,7 @@ services:
       - "8000:8000"
     restart: unless-stopped
     init: true
+    stop_grace_period: 180s
     environment:
       DB_HOST: ai-db
       DB_PORT: "3306"
@@ -27,8 +28,10 @@ services:
       GROQ_MODEL: ${GROQ_MODEL:-}
       GROQ_TIMEOUT_SECONDS: ${GROQ_TIMEOUT_SECONDS:-5}
       PTEXT_MODEL_PATH: ${PTEXT_MODEL_PATH:-/models/ptext-koelectra-v1-2epoch-20260929}
-      OMP_NUM_THREADS: ${OMP_NUM_THREADS:-2}
-      MKL_NUM_THREADS: ${MKL_NUM_THREADS:-2}
+      PTEXT_BATCH_SIZE: ${PTEXT_BATCH_SIZE:-8}
+      UVICORN_WORKERS: ${UVICORN_WORKERS:-2}
+      OMP_NUM_THREADS: ${OMP_NUM_THREADS:-1}
+      MKL_NUM_THREADS: ${MKL_NUM_THREADS:-1}
       TOKENIZERS_PARALLELISM: "false"
       HF_HUB_OFFLINE: "1"
       TRANSFORMERS_OFFLINE: "1"
