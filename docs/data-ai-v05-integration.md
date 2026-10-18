@@ -1,6 +1,13 @@
 <!-- v0.5 결과 계약과 Data Swagger를 기준으로 구현한 API·인증·분석 정책을 설명한다. -->
 # Data AI v0.5 연동
 
+## 2026-10-18 추가: Text 배치·Worker·빈 근거 안내
+
+P_text는 기본 8건 텐서 배치(`PTEXT_BATCH_SIZE`, 1~32)를 사용하며 Network 비교 집합은 나누지 않는다.
+`UVICORN_WORKERS` 기본 후보는 2, OMP/MKL 기본은 1이다. [실행 및 종료 한계](worker-concurrency.md)를 따른다.
+원본 근거가 빈 신규 결과에는 [점수/가용성 중립 안내](reason-explanations.md)를 제공한다.
+기존 Groq 사유 변환과 DONE replay는 보존하며 모델·점수 정책·계약 버전은 그대로다.
+
 ## 2026-10-09 추가: 점수 포화 완화 정책
 
 신규 분석의 점수 정책은 [rti-v0.1](rti-policy-v01.md)을 따른다.
@@ -105,7 +112,8 @@ Python 직접 실행은 실제 경로를 지정하고, Compose는 `PTEXT_MODEL_H
 모델 폴더는 Git/이미지에 넣지 않는다. 없는 호스트 경로는 Compose 기동 오류로 처리한다.
 
 P_text는 첫 분석 시 로드하고 프로세스 내 캐시 및 RLock으로 로딩·추론을 직렬화한다.
-worker는 1개이며 OMP_NUM_THREADS/MKL_NUM_THREADS는 기본 2다. 여러 worker를 켜면 모델 메모리가 프로세스마다 복제된다.
+최초 통합 때 worker 1 / OMP·MKL 2를 검증했다. 2026-10-18 실행 후보는 worker 2 / OMP·MKL 1이며
+환경변수로 worker 1도 사용할 수 있다. 모델 메모리는 프로세스마다 복제된다.
 코드는 CUDA 가능 시 GPU를 선택하고 그 외에는 CPU를 선택한다. 기본 이미지는 requirements-ml.txt의 CPU 전용 torch를 사용한다.
 health는 lazy loading을 유발하지 않으며 모델이 없거나 읽기 불가여도 프로세스 health는 OK일 수 있다.
 따라서 별도의 실제 모델 분석 smoke test가 필요하다. 모델 로딩 실패는 text_score=-1로 전달되며 임의 규칙 점수로 대체하지 않는다.

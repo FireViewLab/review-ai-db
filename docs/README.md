@@ -27,9 +27,12 @@ API 계약 확정을 의미하지 않습니다. 세부 동작은 같은 브랜�
 | [Data POST 분석 SSE](data-analysis-stream.md) | 신규 공식 POST→SSE, 필수 헤더, DB idempotency/replay, 연결 종료·오류·버전·500건 제한 |
 | [RTI rti-v0.1 정책](rti-policy-v01.md) | Text T=2, 낮은 Network 유사도 unavailable, 구 정책 replay 보존, Data 재처리 협의 |
 | [AI 통합 준비 상태](integration-preparation.md) | 자체 MySQL 결과 저장, 팀원 코드와의 차이, 실험 SSE, 미구현 복구 기능. 검증·커밋 관련 기록은 작성 시점 기준 |
-| [Azure 배포 안내](azure-ai-deployment.md) | VM·Secrets·외부 모델 읽기 전용 마운트·worker 1 준비. 이번 단계는 로컬 검증이며 실제 배포 없음 |
+| [Azure 배포 안내](azure-ai-deployment.md) | VM·Secrets·외부 모델 읽기 전용 마운트·Worker 설정. 실제 배포 전 검증 조건 확인 |
 | [2차 런타임 통합 검증](validation/review-ai-runtime-integration-20261002.md) | review-ai-new ff3c149와 기존 운영 구조의 통합 결과·근거·배포 전 TODO |
 | [Groq reasons 한국어 후처리](groq-reason-naturalization.md) | 기본 OFF인 reasons 전용 후처리, 환경변수·배치·시간 제한·키 전환·코드 fallback·외부 전송 범위 |
+| [Worker 병렬 처리](worker-concurrency.md) | Worker 1/2, CPU 스레드·Text batch 설정, 정상 종료·잔류 RUNNING 복구 한계 |
+| [빈 reasons 중립 안내](reason-explanations.md) | 원본 근거 보존, 신규 결과 점수/가용성 안내, 설명 정책·DONE replay |
+| [P_text parity 기준](ptext_batch_parity_test_plan.md) | 원본 단건 Golden과 배치의 점수·label·RTI·순서·truncation 검증 기준 |
 
 현재 브랜치의 핵심 구분:
 
@@ -40,7 +43,7 @@ API 계약 확정을 의미하지 않습니다. 세부 동작은 같은 브랜�
 - API/SSE는 공통 analyze_reviews()와 결과 serializer를 사용하고 KoELECTRA를 lazy load합니다.
 - 선택적 Groq 후처리는 점수 계산 뒤 reasons만 한국어로 바꿉니다. 기본 OFF이며 외부 오류 시 원래 코드로 fallback합니다.
 - 이 결과 계약은 신규 분석 작업 기준입니다. 기본 OFF인 저장 작업 조회는 과거 JSON을 그대로 반환하며 자동 계약 변환은 하지 않습니다.
-- Docker는 CPU 전용 추론 의존성과 외부 모델 읽기 전용 마운트, worker 1을 사용합니다. 모델 파일은 Git에 넣지 않습니다.
+- Docker는 CPU 전용 추론과 외부 모델 읽기 전용 마운트를 사용합니다. Worker 기본 후보 2, Text batch 기본 8은 환경변수로 조정하며 모델 파일은 Git에 넣지 않습니다.
 - 경로·입력·인증·MySQL은 유지합니다. 이전 null·80/50·사유 코드와 통합 -1·70/40·출처 접두사 결과의 차이는 Data 소비자 확인이 필요합니다.
 
 ## 협의 중

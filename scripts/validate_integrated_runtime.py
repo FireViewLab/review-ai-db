@@ -78,6 +78,8 @@ def main() -> None:
     from app.repositories.mysql_jobs import MySQLJobStore
     from app.services.analysis import analyze_reviews
 
+    report["environment"]["ptext_batch_size"] = p_text.configured_batch_size()
+
     torch.set_num_threads(args.cpu_threads)
     torch.set_num_interop_threads(1)
     assert not torch.cuda.is_available(), "This validation is deliberately CPU-only"
@@ -133,6 +135,15 @@ def main() -> None:
                        and result["behavior_score"] == -1 for result in expected["results"])
             report["analysis_3"] = {"seconds": seconds, "result": expected}
             report["memory"]["after_3_reviews"] = memory_snapshot()
+
+            # Scoring parity uses raw rows above. API adds only the neutral empty-evidence notice.
+            from copy import deepcopy
+            from app.contracts.data_ai_v05 import DataReviewResultV05
+            from app.services.reason_explanations import build_explanation_context, neutral_reasons
+            expected = deepcopy(expected)
+            for row in expected["results"]:
+                if not row["reasons"]:
+                    row["reasons"] = neutral_reasons(build_explanation_context(DataReviewResultV05.model_validate(row)))
 
             for count in (10, 100):
                 if count > args.max_reviews:
