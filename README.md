@@ -52,8 +52,8 @@ $env:ENABLE_EXPERIMENTAL_COLLECTION = "0"
 $env:GOOGLE_APPLICATION_CREDENTIALS = ""
 # 외부 모델 폴더의 실제 경로로 바꿉니다. 모델 파일을 저장소에 복사하지 않습니다.
 $env:PTEXT_MODEL_PATH = "C:/models/ptext-koelectra-v1-2epoch-20260929"
-$env:OMP_NUM_THREADS = "2"
-$env:MKL_NUM_THREADS = "2"
+$env:OMP_NUM_THREADS = "1"
+$env:MKL_NUM_THREADS = "1"
 .\.venv\Scripts\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8000 --workers 1
 ```
 
@@ -66,7 +66,7 @@ if [ ! -d .venv ]; then python3.12 -m venv .venv; fi
 docker compose up -d ai-db
 ENABLE_EXPERIMENTAL_COLLECTION=0 GOOGLE_APPLICATION_CREDENTIALS="" \
   PTEXT_MODEL_PATH=/absolute/models/ptext-koelectra-v1-2epoch-20260929 \
-  OMP_NUM_THREADS=2 MKL_NUM_THREADS=2 \
+  OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
   .venv/bin/python -m uvicorn main:app --host 127.0.0.1 --port 8000 --workers 1
 ```
 
@@ -168,8 +168,9 @@ rating/written_at은 선택입니다. 리뷰 1~500개, 단일 상품 배치이�
 기본 가중치는 text/behavior/network = 50/30/20이며 사용 가능한 신호만 재정규화합니다.
 계산 불가 점수는 `-1`이며 null이나 0으로 대체하지 않습니다. 세 점수가 모두 -1일 때만 rti=-1/level=null입니다.
 RTI는 소수점 한 자리로 반올림하며 70 이상 safe, 40 이상 warn, 40 미만 danger입니다.
-reasons는 기본 `TEXT_*`/`BEHAVIOR_*`/`NETWORK_*` 코드 배열입니다. 선택적 Groq 후처리를 켜면
-한국어 문장으로 바뀔 수 있으며 fallback 시 코드/문장이 섞일 수 있습니다. `review_count`는 응답 필수 필드입니다.
+reasons는 analyzer의 `TEXT_*`/`BEHAVIOR_*`/`NETWORK_*` 코드 또는 한국어 안내 배열입니다.
+기존 코드가 있으면 선택적 Groq 후처리를 사용하고, 원본 근거가 비어 있던 신규 결과에는
+점수 구간·신호 가용성의 중립 안내를 제공합니다. 코드/문장이 섞일 수 있으며 `review_count`는 응답 필수 필드입니다.
 작업·입력·결과를 MySQL에 저장하고, 커밋 성공 후 X-Analysis-Job-ID와 최종 결과를 반환합니다.
 분석·저장 실패는 503입니다. 자세한 내용은 [v0.5 연동 문서](docs/data-ai-v05-integration.md)를 참고하세요.
 
@@ -183,6 +184,9 @@ reasons는 기본 `TEXT_*`/`BEHAVIOR_*`/`NETWORK_*` 코드 배열입니다. 선�
 점수·등급·-1 규칙·식별자·응답 필드는 그대로이며, 외부 오류·설정 누락·시간 초과는 기존 코드로 fallback합니다.
 키는 환경변수로만 관리합니다. 활성화 시 리뷰 본문이 Groq로 전송되므로 실제 키·문장 품질·외부 전송 정책을 확인해야 합니다.
 배치·timeout·보조 키 전환·혼합 문자열 처리와 설정은 [Groq 후처리 안내](docs/groq-reason-naturalization.md)를 참고하세요.
+
+빈 근거에는 LLM 호출 없이 [중립 안내](docs/reason-explanations.md)를 제공합니다.
+이 안내는 새로운 위험 판정이 아니며, 과거 DONE replay의 빈 배열은 그대로 보존됩니다.
 
 ## 테스트와 Docker 실행
 
@@ -219,8 +223,13 @@ docker compose logs --tail 50 ai
 
 Docker에는 AI 서비스와 MySQL 8.0이 있으며 AI 프로세스는 비-root 사용자로 실행합니다.
 소스·실행 의존성만 복사하고 .env, 데이터, 팀원 DB, artifacts, 크롤링 도구는 제외합니다.
-production에서는 reload를 사용하지 않고 worker는 1개입니다. `requirements-ml.txt`의 CPU 전용 torch와
-transformers를 설치하며 OMP/MKL 스레드는 기본 2개입니다. 모델 lazy loading·프로세스 내 캐시·RLock을 유지합니다.
+production에서는 reload를 사용하지 않으며 `UVICORN_WORKERS`로 독립 Uvicorn 프로세스 수를 설정합니다(기본 2).
+앞의 로컬 빠른 시작 예시는 Worker 1개를 사용합니다.
+`OMP_NUM_THREADS`와 `MKL_NUM_THREADS`는 각 프로세스에서 사용하는 CPU 연산 라이브러리의 병렬 스레드 설정이며 기본값은 각각 1입니다.
+`PTEXT_BATCH_SIZE`는 한 번에 KoELECTRA 모델로 전달하는 리뷰 개수이며 1~32, 기본 8입니다.
+Text 텐서 배치만 제어하며 Network는 상품 리뷰 전체를 비교합니다. [Worker·종료 안내](docs/worker-concurrency.md)를 참고하세요.
+`requirements-ml.txt`의 CPU 전용 torch와
+transformers를 설치하며 모델 lazy loading·프로세스 내 캐시·RLock을 유지합니다.
 모델 파일은 이미지/Git에 포함하지 않습니다. CPU 이미지와 별개로 코드의 CUDA 자동 선택/CPU fallback 경로는 보존합니다.
 MySQL은 기존 `ai-db-data` 볼륨(`/var/lib/mysql`)을 재사용합니다.
 Compose 프로젝트 이름을 바꾸면 다른 볼륨이 생성되므로 기존 프로젝트 이름을 유지하세요.

@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal, Sequence
 
-from app.analyzers.p_text import predict_text_score
+from app.analyzers.p_text import predict_text_scores
 from app.analyzers.behavior import BehaviorInput, analyze_behavior
 from app.analyzers.network import (
     NetworkReview,
@@ -124,8 +124,10 @@ def analyze_product_reviews(
         similarity_adapter, NormalizedTextSimilarityAdapter,
     )
     batch_network = analyze_network_batch(network_reviews) if use_runtime_batch else None
-    for index, (review, network_target) in enumerate(zip(reviews, network_reviews, strict=True)):
-        prediction = predict_text_score(review.content)
+    predictions = predict_text_scores([review.content for review in reviews])
+    for index, (review, network_target, prediction) in enumerate(
+        zip(reviews, network_reviews, predictions, strict=True)
+    ):
         # Rules provide observable reasons only; they never replace model scores.
         text_result = analyze_text(
             review.content, sentiment_analyzer=sentiment_analyzer,

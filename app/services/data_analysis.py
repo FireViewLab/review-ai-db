@@ -2,9 +2,11 @@
 import logging
 
 from app.contracts.data_ai_v05 import DataAnalyzeRequestV05, DataAnalyzeResponseV05
+from app.core.analysis_versions import explanation_policy_version
 from app.integrations.groq_reason_naturalizer import naturalize_reasons_batch
 from app.repositories.analysis_jobs import JobStore
 from app.services.analysis import analyze_reviews
+from app.services.reason_explanations import build_explanation_context, neutral_reasons
 
 LOGGER = logging.getLogger(__name__)
 
@@ -12,6 +14,7 @@ LOGGER = logging.getLogger(__name__)
 def evaluate_data_and_store(store: JobStore, job_id: str,
                             payload: DataAnalyzeRequestV05) -> DataAnalyzeResponseV05:
     try:
+        applied_explanation_version = explanation_policy_version()
         # 운영 입력 계약은 그대로 유지한다. rating/written_at만으로 행동 근거를 만들지 않는다.
         # 실제로 제공되는 행동 evidence 확장은 Data 팀과 입력 계약을 합의한 뒤 연결한다.
         evaluated = analyze_reviews(
@@ -20,6 +23,8 @@ def evaluate_data_and_store(store: JobStore, job_id: str,
                      for review in payload.reviews],
         )
         response = DataAnalyzeResponseV05.model_validate(evaluated)
+        # Raw codes stay available internally even when Groq phrases the API result.
+        explanation_contexts = [build_explanation_context(result) for result in response.results]
         # 선택 기능의 실패는 점수·응답·저장 성공에 영향을 주지 않는다.
         # 새 문구도 동일한 계약으로 검증하고 reasons 외의 필드는 복사만 한다.
         try:
@@ -38,7 +43,15 @@ def evaluate_data_and_store(store: JobStore, job_id: str,
             response = DataAnalyzeResponseV05.model_validate(enriched)
         except Exception:
             pass
-        store.complete(job_id, response.model_dump(mode="json"))
+        # Empty raw evidence receives only a deterministic score/availability notice.
+        # It is never sent to Groq and remains independent of provider failures.
+        explained = response.model_dump(mode="json")
+        for result, context in zip(explained["results"], explanation_contexts, strict=True):
+            if not context.raw_reason_codes:
+                result["reasons"] = neutral_reasons(context)
+        response = DataAnalyzeResponseV05.model_validate(explained)
+        store.complete(job_id, response.model_dump(mode="json"),
+                       explanation_policy_version=applied_explanation_version)
         return response
     except Exception:
         try:

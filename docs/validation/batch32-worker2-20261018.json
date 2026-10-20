@@ -1,0 +1,1031 @@
+{
+  "run_id": "2ae36f83-370c-4864-b5e4-2c55cfe918fb",
+  "workers": 2,
+  "batch_size": 32,
+  "single_baseline": false,
+  "reviews_per_request": 32,
+  "concurrency": 2,
+  "warm_rounds": 3,
+  "versions": {
+    "contract_version": "v0.5",
+    "model_version": "ptext-koelectra-v1-2epoch-20260929",
+    "policy_version": "rti-v0.1"
+  },
+  "external_network_used": false,
+  "sample_limit": "Small synthetic sample; p95 is descriptive, not a production capacity estimate.",
+  "total_seconds": 14.864332899999908,
+  "cold_request_seconds": [
+    5.737802300000112,
+    5.738211399999955
+  ],
+  "additional_model_warmup_seconds": [],
+  "warm_total_seconds": 6.363497499999994,
+  "warm_request_seconds": [
+    2.14248960000009,
+    2.166318399999909,
+    2.053748799999994,
+    2.0805041999999503,
+    2.0774352999999337,
+    2.0473153000000366
+  ],
+  "warm_mean_seconds": 2.094635266666652,
+  "warm_p95_seconds": 2.1603611999999544,
+  "warm_reviews_per_second": 30.172086969469255,
+  "model_loading": [
+    {
+      "kind": "model_load_end",
+      "pid": 9,
+      "monotonic": 825.293059051,
+      "seconds": 2.5545172330000696,
+      "succeeded": true,
+      "device": "cpu"
+    },
+    {
+      "kind": "model_load_end",
+      "pid": 10,
+      "monotonic": 825.29391871,
+      "seconds": 2.56342169200002,
+      "succeeded": true,
+      "device": "cpu"
+    }
+  ],
+  "loaded_worker_pids": [
+    9,
+    10
+  ],
+  "cross_process_overlap_observed": true,
+  "overlap_pairs": [
+    {
+      "pids": [
+        9,
+        10
+      ],
+      "seconds": 5.684025173000009,
+      "products": [
+        "benchmark-2ae36f83-370c-4864-b5e4-2c55cfe918fb-cold-0-0",
+        "benchmark-2ae36f83-370c-4864-b5e4-2c55cfe918fb-cold-0-1"
+      ]
+    },
+    {
+      "pids": [
+        10,
+        9
+      ],
+      "seconds": 2.1029458130000194,
+      "products": [
+        "benchmark-2ae36f83-370c-4864-b5e4-2c55cfe918fb-warm-0-0",
+        "benchmark-2ae36f83-370c-4864-b5e4-2c55cfe918fb-warm-0-1"
+      ]
+    },
+    {
+      "pids": [
+        10,
+        9
+      ],
+      "seconds": 2.0168311889999586,
+      "products": [
+        "benchmark-2ae36f83-370c-4864-b5e4-2c55cfe918fb-warm-1-0",
+        "benchmark-2ae36f83-370c-4864-b5e4-2c55cfe918fb-warm-1-1"
+      ]
+    },
+    {
+      "pids": [
+        10,
+        9
+      ],
+      "seconds": 2.0146494010000424,
+      "products": [
+        "benchmark-2ae36f83-370c-4864-b5e4-2c55cfe918fb-warm-2-1",
+        "benchmark-2ae36f83-370c-4864-b5e4-2c55cfe918fb-warm-2-0"
+      ]
+    }
+  ],
+  "sse_success_count": 10,
+  "sse_failure_count": 0,
+  "concurrent_idempotency": {
+    "seconds": 2.025868199999877,
+    "statuses": [
+      200,
+      409
+    ],
+    "analysis_started_count": 1,
+    "job_id": "0e6291bd-8ad6-4a7b-a713-264dc2d54a8b",
+    "successful_sse_count": 1,
+    "expected_in_progress_count": 1
+  },
+  "replay_seconds": 0.03205019999995784,
+  "replay_without_analysis": true,
+  "stored_results_match": true,
+  "scores_identical_across_requests": true,
+  "sample_results": [
+    {
+      "review_id": "benchmark-review-0000",
+      "rti": 73.1,
+      "level": "safe",
+      "text_score": 96.0,
+      "behavior_score": -1.0,
+      "network_score": 16.0,
+      "reasons": [
+        "NETWORK_SIMILAR_REVIEW_CLUSTER"
+      ]
+    },
+    {
+      "review_id": "benchmark-review-0001",
+      "rti": 71.1,
+      "level": "safe",
+      "text_score": 96.0,
+      "behavior_score": -1.0,
+      "network_score": 8.8,
+      "reasons": [
+        "NETWORK_SIMILAR_REVIEW_CLUSTER"
+      ]
+    },
+    {
+      "review_id": "benchmark-review-0002",
+      "rti": 71.3,
+      "level": "safe",
+      "text_score": 96.0,
+      "behavior_score": -1.0,
+      "network_score": 9.5,
+      "reasons": [
+        "NETWORK_SIMILAR_REVIEW_CLUSTER"
+      ]
+    },
+    {
+      "review_id": "benchmark-review-0003",
+      "rti": 71.4,
+      "level": "safe",
+      "text_score": 96.0,
+      "behavior_score": -1.0,
+      "network_score": 9.8,
+      "reasons": [
+        "NETWORK_SIMILAR_REVIEW_CLUSTER"
+      ]
+    },
+    {
+      "review_id": "benchmark-review-0004",
+      "rti": 73.1,
+      "level": "safe",
+      "text_score": 96.0,
+      "behavior_score": -1.0,
+      "network_score": 16.0,
+      "reasons": [
+        "NETWORK_SIMILAR_REVIEW_CLUSTER"
+      ]
+    },
+    {
+      "review_id": "benchmark-review-0005",
+      "rti": 72.5,
+      "level": "safe",
+      "text_score": 96.0,
+      "behavior_score": -1.0,
+      "network_score": 13.6,
+      "reasons": [
+        "NETWORK_SIMILAR_REVIEW_CLUSTER"
+      ]
+    },
+    {
+      "review_id": "benchmark-review-0006",
+      "rti": 72.9,
+      "level": "safe",
+      "text_score": 96.0,
+      "behavior_score": -1.0,
+      "network_score": 15.2,
+      "reasons": [
+        "NETWORK_SIMILAR_REVIEW_CLUSTER"
+      ]
+    },
+    {
+      "review_id": "benchmark-review-0007",
+      "rti": 72.9,
+      "level": "safe",
+      "text_score": 96.0,
+      "behavior_score": -1.0,
+      "network_score": 15.1,
+      "reasons": [
+        "NETWORK_SIMILAR_REVIEW_CLUSTER"
+      ]
+    },
+    {
+      "review_id": "benchmark-review-0008",
+      "rti": 73.1,
+      "level": "safe",
+      "text_score": 96.0,
+      "behavior_score": -1.0,
+      "network_score": 16.0,
+      "reasons": [
+        "NETWORK_SIMILAR_REVIEW_CLUSTER"
+      ]
+    },
+    {
+      "review_id": "benchmark-review-0009",
+      "rti": 72.5,
+      "level": "safe",
+      "text_score": 96.0,
+      "behavior_score": -1.0,
+      "network_score": 13.6,
+      "reasons": [
+        "NETWORK_SIMILAR_REVIEW_CLUSTER"
+      ]
+    },
+    {
+      "review_id": "benchmark-review-0010",
+      "rti": 73.4,
+      "level": "safe",
+      "text_score": 96.0,
+      "behavior_score": -1.0,
+      "network_score": 16.8,
+      "reasons": [
+        "NETWORK_SIMILAR_REVIEW_CLUSTER"
+      ]
+    },
+    {
+      "review_id": "benchmark-review-0011",
+      "rti": 73.0,
+      "level": "safe",
+      "text_score": 96.0,
+      "behavior_score": -1.0,
+      "network_score": 15.4,
+      "reasons": [
+        "NETWORK_SIMILAR_REVIEW_CLUSTER"
+      ]
+    },
+    {
+      "review_id": "benchmark-review-0012",
+      "rti": 73.2,
+      "level": "safe",
+      "text_score": 96.0,
+      "behavior_score": -1.0,
+      "network_score": 16.1,
+      "reasons": [
+        "NETWORK_SIMILAR_REVIEW_CLUSTER"
+      ]
+    },
+    {
+      "review_id": "benchmark-review-0013",
+      "rti": 71.6,
+      "level": "safe",
+      "text_score": 96.0,
+      "behavior_score": -1.0,
+      "network_score": 10.5,
+      "reasons": [
+        "NETWORK_SIMILAR_REVIEW_CLUSTER"
+      ]
+    },
+    {
+      "review_id": "benchmark-review-0014",
+      "rti": 73.4,
+      "level": "safe",
+      "text_score": 96.0,
+      "behavior_score": -1.0,
+      "network_score": 16.8,
+      "reasons": [
+        "NETWORK_SIMILAR_REVIEW_CLUSTER"
+      ]
+    },
+    {
+      "review_id": "benchmark-review-0015",
+      "rti": 73.0,
+      "level": "safe",
+      "text_score": 96.0,
+      "behavior_score": -1.0,
+      "network_score": 15.4,
+      "reasons": [
+        "NETWORK_SIMILAR_REVIEW_CLUSTER"
+      ]
+    },
+    {
+      "review_id": "benchmark-review-0016",
+      "rti": 73.2,
+      "level": "safe",
+      "text_score": 96.0,
+      "behavior_score": -1.0,
+      "network_score": 16.1,
+      "reasons": [
+        "NETWORK_SIMILAR_REVIEW_CLUSTER"
+      ]
+    },
+    {
+      "review_id": "benchmark-review-0017",
+      "rti": 71.6,
+      "level": "safe",
+      "text_score": 96.0,
+      "behavior_score": -1.0,
+      "network_score": 10.5,
+      "reasons": [
+        "NETWORK_SIMILAR_REVIEW_CLUSTER"
+      ]
+    },
+    {
+      "review_id": "benchmark-review-0018",
+      "rti": 73.4,
+      "level": "safe",
+      "text_score": 96.0,
+      "behavior_score": -1.0,
+      "network_score": 16.8,
+      "reasons": [
+        "NETWORK_SIMILAR_REVIEW_CLUSTER"
+      ]
+    },
+    {
+      "review_id": "benchmark-review-0019",
+      "rti": 73.0,
+      "level": "safe",
+      "text_score": 96.0,
+      "behavior_score": -1.0,
+      "network_score": 15.4,
+      "reasons": [
+        "NETWORK_SIMILAR_REVIEW_CLUSTER"
+      ]
+    },
+    {
+      "review_id": "benchmark-review-0020",
+      "rti": 73.1,
+      "level": "safe",
+      "text_score": 96.0,
+      "behavior_score": -1.0,
+      "network_score": 15.7,
+      "reasons": [
+        "NETWORK_SIMILAR_REVIEW_CLUSTER"
+      ]
+    },
+    {
+      "review_id": "benchmark-review-0021",
+      "rti": 73.0,
+      "level": "safe",
+      "text_score": 96.0,
+      "behavior_score": -1.0,
+      "network_score": 15.6,
+      "reasons": [
+        "NETWORK_SIMILAR_REVIEW_CLUSTER"
+      ]
+    },
+    {
+      "review_id": "benchmark-review-0022",
+      "rti": 71.8,
+      "level": "safe",
+      "text_score": 96.0,
+      "behavior_score": -1.0,
+      "network_score": 11.3,
+      "reasons": [
+        "NETWORK_SIMILAR_REVIEW_CLUSTER"
+      ]
+    },
+    {
+      "review_id": "benchmark-review-0023",
+      "rti": 73.1,
+      "level": "safe",
+      "text_score": 96.0,
+      "behavior_score": -1.0,
+      "network_score": 15.9,
+      "reasons": [
+        "NETWORK_SIMILAR_REVIEW_CLUSTER"
+      ]
+    },
+    {
+      "review_id": "benchmark-review-0024",
+      "rti": 73.1,
+      "level": "safe",
+      "text_score": 96.0,
+      "behavior_score": -1.0,
+      "network_score": 15.7,
+      "reasons": [
+        "NETWORK_SIMILAR_REVIEW_CLUSTER"
+      ]
+    },
+    {
+      "review_id": "benchmark-review-0025",
+      "rti": 73.0,
+      "level": "safe",
+      "text_score": 96.0,
+      "behavior_score": -1.0,
+      "network_score": 15.6,
+      "reasons": [
+        "NETWORK_SIMILAR_REVIEW_CLUSTER"
+      ]
+    },
+    {
+      "review_id": "benchmark-review-0026",
+      "rti": 71.8,
+      "level": "safe",
+      "text_score": 96.0,
+      "behavior_score": -1.0,
+      "network_score": 11.3,
+      "reasons": [
+        "NETWORK_SIMILAR_REVIEW_CLUSTER"
+      ]
+    },
+    {
+      "review_id": "benchmark-review-0027",
+      "rti": 73.1,
+      "level": "safe",
+      "text_score": 96.0,
+      "behavior_score": -1.0,
+      "network_score": 15.9,
+      "reasons": [
+        "NETWORK_SIMILAR_REVIEW_CLUSTER"
+      ]
+    },
+    {
+      "review_id": "benchmark-review-0028",
+      "rti": 73.1,
+      "level": "safe",
+      "text_score": 96.0,
+      "behavior_score": -1.0,
+      "network_score": 15.7,
+      "reasons": [
+        "NETWORK_SIMILAR_REVIEW_CLUSTER"
+      ]
+    },
+    {
+      "review_id": "benchmark-review-0029",
+      "rti": 73.0,
+      "level": "safe",
+      "text_score": 96.0,
+      "behavior_score": -1.0,
+      "network_score": 15.6,
+      "reasons": [
+        "NETWORK_SIMILAR_REVIEW_CLUSTER"
+      ]
+    },
+    {
+      "review_id": "benchmark-review-0030",
+      "rti": 74.4,
+      "level": "safe",
+      "text_score": 96.0,
+      "behavior_score": -1.0,
+      "network_score": 20.3,
+      "reasons": [
+        "NETWORK_SIMILAR_REVIEW_CLUSTER"
+      ]
+    },
+    {
+      "review_id": "benchmark-review-0031",
+      "rti": 71.8,
+      "level": "safe",
+      "text_score": 96.0,
+      "behavior_score": -1.0,
+      "network_score": 11.3,
+      "reasons": [
+        "NETWORK_SIMILAR_REVIEW_CLUSTER"
+      ]
+    }
+  ],
+  "states": {
+    "10": {
+      "pid": 10,
+      "workers": 2,
+      "batch_size": 32,
+      "single_baseline": false,
+      "versions": {
+        "contract_version": "v0.5",
+        "model_version": "ptext-koelectra-v1-2epoch-20260929",
+        "policy_version": "rti-v0.1"
+      },
+      "memory": {
+        "VmHWM_bytes": 794804224,
+        "VmRSS_bytes": 762122240
+      },
+      "model_cache": {
+        "hits": 3,
+        "misses": 1,
+        "maxsize": 1,
+        "currsize": 1
+      },
+      "events": [
+        {
+          "kind": "analysis_start",
+          "pid": 10,
+          "monotonic": 822.705731185,
+          "analysis_id": "8866898b-6b3f-4718-8c4f-a1c1f835a717",
+          "product_id": "benchmark-2ae36f83-370c-4864-b5e4-2c55cfe918fb-cold-0-1",
+          "review_count": 32
+        },
+        {
+          "kind": "model_load_start",
+          "pid": 10,
+          "monotonic": 822.730497271
+        },
+        {
+          "kind": "model_load_end",
+          "pid": 10,
+          "monotonic": 825.29391871,
+          "seconds": 2.56342169200002,
+          "succeeded": true,
+          "device": "cpu"
+        },
+        {
+          "kind": "analysis_end",
+          "pid": 10,
+          "monotonic": 828.403434097,
+          "analysis_id": "8866898b-6b3f-4718-8c4f-a1c1f835a717",
+          "product_id": "benchmark-2ae36f83-370c-4864-b5e4-2c55cfe918fb-cold-0-1",
+          "seconds": 5.697700863000023,
+          "succeeded": true
+        },
+        {
+          "kind": "analysis_start",
+          "pid": 10,
+          "monotonic": 828.765349708,
+          "analysis_id": "2436d650-123e-434c-9ad0-a534dfd0cba7",
+          "product_id": "benchmark-2ae36f83-370c-4864-b5e4-2c55cfe918fb-warm-0-0",
+          "review_count": 32
+        },
+        {
+          "kind": "analysis_end",
+          "pid": 10,
+          "monotonic": 830.868295521,
+          "analysis_id": "2436d650-123e-434c-9ad0-a534dfd0cba7",
+          "product_id": "benchmark-2ae36f83-370c-4864-b5e4-2c55cfe918fb-warm-0-0",
+          "seconds": 2.1029452289999426,
+          "succeeded": true
+        },
+        {
+          "kind": "analysis_start",
+          "pid": 10,
+          "monotonic": 830.93973754,
+          "analysis_id": "1f72ec95-8856-4083-ba51-6831d5dda8de",
+          "product_id": "benchmark-2ae36f83-370c-4864-b5e4-2c55cfe918fb-warm-1-0",
+          "review_count": 32
+        },
+        {
+          "kind": "analysis_end",
+          "pid": 10,
+          "monotonic": 832.956568729,
+          "analysis_id": "1f72ec95-8856-4083-ba51-6831d5dda8de",
+          "product_id": "benchmark-2ae36f83-370c-4864-b5e4-2c55cfe918fb-warm-1-0",
+          "seconds": 2.016829586999961,
+          "succeeded": true
+        },
+        {
+          "kind": "analysis_start",
+          "pid": 10,
+          "monotonic": 833.03157,
+          "analysis_id": "a189b1f8-5a3d-4c5d-a096-38a25781802c",
+          "product_id": "benchmark-2ae36f83-370c-4864-b5e4-2c55cfe918fb-warm-2-1",
+          "review_count": 32
+        },
+        {
+          "kind": "analysis_end",
+          "pid": 10,
+          "monotonic": 835.046242366,
+          "analysis_id": "a189b1f8-5a3d-4c5d-a096-38a25781802c",
+          "product_id": "benchmark-2ae36f83-370c-4864-b5e4-2c55cfe918fb-warm-2-1",
+          "seconds": 2.0146699720000925,
+          "succeeded": true
+        }
+      ]
+    }
+  },
+  "analysis_events": [
+    {
+      "kind": "analysis_start",
+      "pid": 10,
+      "monotonic": 822.705731185,
+      "analysis_id": "8866898b-6b3f-4718-8c4f-a1c1f835a717",
+      "product_id": "benchmark-2ae36f83-370c-4864-b5e4-2c55cfe918fb-cold-0-1",
+      "review_count": 32
+    },
+    {
+      "kind": "analysis_start",
+      "pid": 9,
+      "monotonic": 822.718339753,
+      "analysis_id": "260113d8-b366-40c4-8916-833c6362e7e2",
+      "product_id": "benchmark-2ae36f83-370c-4864-b5e4-2c55cfe918fb-cold-0-0",
+      "review_count": 32
+    },
+    {
+      "kind": "model_load_start",
+      "pid": 10,
+      "monotonic": 822.730497271
+    },
+    {
+      "kind": "model_load_start",
+      "pid": 9,
+      "monotonic": 822.738540836
+    },
+    {
+      "kind": "model_load_end",
+      "pid": 9,
+      "monotonic": 825.293059051,
+      "seconds": 2.5545172330000696,
+      "succeeded": true,
+      "device": "cpu"
+    },
+    {
+      "kind": "model_load_end",
+      "pid": 10,
+      "monotonic": 825.29391871,
+      "seconds": 2.56342169200002,
+      "succeeded": true,
+      "device": "cpu"
+    },
+    {
+      "kind": "analysis_end",
+      "pid": 9,
+      "monotonic": 828.402364926,
+      "analysis_id": "260113d8-b366-40c4-8916-833c6362e7e2",
+      "product_id": "benchmark-2ae36f83-370c-4864-b5e4-2c55cfe918fb-cold-0-0",
+      "seconds": 5.6840231989999666,
+      "succeeded": true
+    },
+    {
+      "kind": "analysis_end",
+      "pid": 10,
+      "monotonic": 828.403434097,
+      "analysis_id": "8866898b-6b3f-4718-8c4f-a1c1f835a717",
+      "product_id": "benchmark-2ae36f83-370c-4864-b5e4-2c55cfe918fb-cold-0-1",
+      "seconds": 5.697700863000023,
+      "succeeded": true
+    },
+    {
+      "kind": "analysis_start",
+      "pid": 9,
+      "monotonic": 828.765230061,
+      "analysis_id": "c100df27-7810-4fa5-8ab6-07f60bdd6366",
+      "product_id": "benchmark-2ae36f83-370c-4864-b5e4-2c55cfe918fb-warm-0-1",
+      "review_count": 32
+    },
+    {
+      "kind": "analysis_start",
+      "pid": 10,
+      "monotonic": 828.765349708,
+      "analysis_id": "2436d650-123e-434c-9ad0-a534dfd0cba7",
+      "product_id": "benchmark-2ae36f83-370c-4864-b5e4-2c55cfe918fb-warm-0-0",
+      "review_count": 32
+    },
+    {
+      "kind": "analysis_end",
+      "pid": 10,
+      "monotonic": 830.868295521,
+      "analysis_id": "2436d650-123e-434c-9ad0-a534dfd0cba7",
+      "product_id": "benchmark-2ae36f83-370c-4864-b5e4-2c55cfe918fb-warm-0-0",
+      "seconds": 2.1029452289999426,
+      "succeeded": true
+    },
+    {
+      "kind": "analysis_end",
+      "pid": 9,
+      "monotonic": 830.8923363,
+      "analysis_id": "c100df27-7810-4fa5-8ab6-07f60bdd6366",
+      "product_id": "benchmark-2ae36f83-370c-4864-b5e4-2c55cfe918fb-warm-0-1",
+      "seconds": 2.1271058049999283,
+      "succeeded": true
+    },
+    {
+      "kind": "analysis_start",
+      "pid": 9,
+      "monotonic": 830.939715138,
+      "analysis_id": "8d724b9b-68ba-44be-9cc6-6d22928f099e",
+      "product_id": "benchmark-2ae36f83-370c-4864-b5e4-2c55cfe918fb-warm-1-1",
+      "review_count": 32
+    },
+    {
+      "kind": "analysis_start",
+      "pid": 10,
+      "monotonic": 830.93973754,
+      "analysis_id": "1f72ec95-8856-4083-ba51-6831d5dda8de",
+      "product_id": "benchmark-2ae36f83-370c-4864-b5e4-2c55cfe918fb-warm-1-0",
+      "review_count": 32
+    },
+    {
+      "kind": "analysis_end",
+      "pid": 10,
+      "monotonic": 832.956568729,
+      "analysis_id": "1f72ec95-8856-4083-ba51-6831d5dda8de",
+      "product_id": "benchmark-2ae36f83-370c-4864-b5e4-2c55cfe918fb-warm-1-0",
+      "seconds": 2.016829586999961,
+      "succeeded": true
+    },
+    {
+      "kind": "analysis_end",
+      "pid": 9,
+      "monotonic": 832.982049326,
+      "analysis_id": "8d724b9b-68ba-44be-9cc6-6d22928f099e",
+      "product_id": "benchmark-2ae36f83-370c-4864-b5e4-2c55cfe918fb-warm-1-1",
+      "seconds": 2.042332027000043,
+      "succeeded": true
+    },
+    {
+      "kind": "analysis_start",
+      "pid": 10,
+      "monotonic": 833.03157,
+      "analysis_id": "a189b1f8-5a3d-4c5d-a096-38a25781802c",
+      "product_id": "benchmark-2ae36f83-370c-4864-b5e4-2c55cfe918fb-warm-2-1",
+      "review_count": 32
+    },
+    {
+      "kind": "analysis_start",
+      "pid": 9,
+      "monotonic": 833.031592965,
+      "analysis_id": "214f1ad9-77ce-4f18-b401-b6c7642b4c5d",
+      "product_id": "benchmark-2ae36f83-370c-4864-b5e4-2c55cfe918fb-warm-2-0",
+      "review_count": 32
+    },
+    {
+      "kind": "analysis_end",
+      "pid": 10,
+      "monotonic": 835.046242366,
+      "analysis_id": "a189b1f8-5a3d-4c5d-a096-38a25781802c",
+      "product_id": "benchmark-2ae36f83-370c-4864-b5e4-2c55cfe918fb-warm-2-1",
+      "seconds": 2.0146699720000925,
+      "succeeded": true
+    },
+    {
+      "kind": "analysis_end",
+      "pid": 9,
+      "monotonic": 835.077895491,
+      "analysis_id": "214f1ad9-77ce-4f18-b401-b6c7642b4c5d",
+      "product_id": "benchmark-2ae36f83-370c-4864-b5e4-2c55cfe918fb-warm-2-0",
+      "seconds": 2.0463010639999766,
+      "succeeded": true
+    },
+    {
+      "kind": "analysis_start",
+      "pid": 9,
+      "monotonic": 835.123588261,
+      "analysis_id": "7d619b92-1dab-4871-8bc6-87cee0bf047c",
+      "product_id": "benchmark-2ae36f83-370c-4864-b5e4-2c55cfe918fb-idempotency",
+      "review_count": 32
+    },
+    {
+      "kind": "analysis_end",
+      "pid": 9,
+      "monotonic": 836.957278571,
+      "analysis_id": "7d619b92-1dab-4871-8bc6-87cee0bf047c",
+      "product_id": "benchmark-2ae36f83-370c-4864-b5e4-2c55cfe918fb-idempotency",
+      "seconds": 1.8336781730000666,
+      "succeeded": true
+    }
+  ],
+  "resource_samples": [
+    {
+      "phase": "cold",
+      "monotonic": 1822.3107622,
+      "cpu_percent": 196.81,
+      "memory_usage": "367.5MiB / 4GiB",
+      "container_memory_bytes": 385351680,
+      "processes": [
+        {
+          "pid": 1,
+          "VmHWM_bytes": 655360,
+          "VmRSS_bytes": 655360,
+          "cpu_seconds": 0.01
+        },
+        {
+          "pid": 7,
+          "VmHWM_bytes": 29671424,
+          "VmRSS_bytes": 29671424,
+          "cpu_seconds": 0.34
+        },
+        {
+          "pid": 9,
+          "VmHWM_bytes": 270491648,
+          "VmRSS_bytes": 270491648,
+          "cpu_seconds": 2.1
+        },
+        {
+          "pid": 10,
+          "VmHWM_bytes": 271319040,
+          "VmRSS_bytes": 271319040,
+          "cpu_seconds": 2.14
+        }
+      ]
+    },
+    {
+      "phase": "cold",
+      "monotonic": 1824.3181322,
+      "cpu_percent": 164.6,
+      "memory_usage": "635.3MiB / 4GiB",
+      "container_memory_bytes": 666160332,
+      "processes": [
+        {
+          "pid": 1,
+          "VmHWM_bytes": 655360,
+          "VmRSS_bytes": 655360,
+          "cpu_seconds": 0.01
+        },
+        {
+          "pid": 7,
+          "VmHWM_bytes": 29671424,
+          "VmRSS_bytes": 29671424,
+          "cpu_seconds": 0.35
+        },
+        {
+          "pid": 9,
+          "VmHWM_bytes": 536670208,
+          "VmRSS_bytes": 536670208,
+          "cpu_seconds": 3.84
+        },
+        {
+          "pid": 10,
+          "VmHWM_bytes": 528822272,
+          "VmRSS_bytes": 528822272,
+          "cpu_seconds": 3.86
+        }
+      ]
+    },
+    {
+      "phase": "cold",
+      "monotonic": 1826.3169605,
+      "cpu_percent": 142.53,
+      "memory_usage": "627.8MiB / 4GiB",
+      "container_memory_bytes": 658296012,
+      "processes": [
+        {
+          "pid": 1,
+          "VmHWM_bytes": 655360,
+          "VmRSS_bytes": 655360,
+          "cpu_seconds": 0.01
+        },
+        {
+          "pid": 7,
+          "VmHWM_bytes": 29671424,
+          "VmRSS_bytes": 29671424,
+          "cpu_seconds": 0.35
+        },
+        {
+          "pid": 9,
+          "VmHWM_bytes": 735105024,
+          "VmRSS_bytes": 735105024,
+          "cpu_seconds": 5.25
+        },
+        {
+          "pid": 10,
+          "VmHWM_bytes": 742264832,
+          "VmRSS_bytes": 742264832,
+          "cpu_seconds": 5.28
+        }
+      ]
+    },
+    {
+      "phase": "warm",
+      "monotonic": 1828.3305006,
+      "cpu_percent": 199.26,
+      "memory_usage": "625.1MiB / 4GiB",
+      "container_memory_bytes": 655464857,
+      "processes": [
+        {
+          "pid": 1,
+          "VmHWM_bytes": 655360,
+          "VmRSS_bytes": 655360,
+          "cpu_seconds": 0.01
+        },
+        {
+          "pid": 7,
+          "VmHWM_bytes": 29671424,
+          "VmRSS_bytes": 29671424,
+          "cpu_seconds": 0.35
+        },
+        {
+          "pid": 9,
+          "VmHWM_bytes": 795463680,
+          "VmRSS_bytes": 788570112,
+          "cpu_seconds": 6.83
+        },
+        {
+          "pid": 10,
+          "VmHWM_bytes": 794648576,
+          "VmRSS_bytes": 785866752,
+          "cpu_seconds": 6.85
+        }
+      ]
+    },
+    {
+      "phase": "warm",
+      "monotonic": 1830.3511597,
+      "cpu_percent": 194.67,
+      "memory_usage": "686.7MiB / 4GiB",
+      "container_memory_bytes": 720057139,
+      "processes": [
+        {
+          "pid": 1,
+          "VmHWM_bytes": 655360,
+          "VmRSS_bytes": 655360,
+          "cpu_seconds": 0.01
+        },
+        {
+          "pid": 7,
+          "VmHWM_bytes": 29671424,
+          "VmRSS_bytes": 29671424,
+          "cpu_seconds": 0.35
+        },
+        {
+          "pid": 9,
+          "VmHWM_bytes": 795480064,
+          "VmRSS_bytes": 788586496,
+          "cpu_seconds": 8.78
+        },
+        {
+          "pid": 10,
+          "VmHWM_bytes": 794656768,
+          "VmRSS_bytes": 785874944,
+          "cpu_seconds": 8.79
+        }
+      ]
+    },
+    {
+      "phase": "warm",
+      "monotonic": 1832.3406207,
+      "cpu_percent": 194.52,
+      "memory_usage": "672.9MiB / 4GiB",
+      "container_memory_bytes": 705586790,
+      "processes": [
+        {
+          "pid": 1,
+          "VmHWM_bytes": 655360,
+          "VmRSS_bytes": 655360,
+          "cpu_seconds": 0.01
+        },
+        {
+          "pid": 7,
+          "VmHWM_bytes": 29671424,
+          "VmRSS_bytes": 29671424,
+          "cpu_seconds": 0.35
+        },
+        {
+          "pid": 9,
+          "VmHWM_bytes": 795480064,
+          "VmRSS_bytes": 759357440,
+          "cpu_seconds": 10.7
+        },
+        {
+          "pid": 10,
+          "VmHWM_bytes": 794804224,
+          "VmRSS_bytes": 762122240,
+          "cpu_seconds": 10.69
+        }
+      ]
+    },
+    {
+      "phase": "idempotency",
+      "monotonic": 1834.3177101,
+      "cpu_percent": 131.53,
+      "memory_usage": "648.7MiB / 4GiB",
+      "container_memory_bytes": 680211251,
+      "processes": [
+        {
+          "pid": 1,
+          "VmHWM_bytes": 655360,
+          "VmRSS_bytes": 655360,
+          "cpu_seconds": 0.01
+        },
+        {
+          "pid": 7,
+          "VmHWM_bytes": 29671424,
+          "VmRSS_bytes": 29671424,
+          "cpu_seconds": 0.35
+        },
+        {
+          "pid": 9,
+          "VmHWM_bytes": 795508736,
+          "VmRSS_bytes": 759386112,
+          "cpu_seconds": 12.63
+        },
+        {
+          "pid": 10,
+          "VmHWM_bytes": 794804224,
+          "VmRSS_bytes": 762122240,
+          "cpu_seconds": 11.68
+        }
+      ]
+    },
+    {
+      "phase": "replay",
+      "monotonic": 1836.3133471,
+      "cpu_percent": 28.19,
+      "memory_usage": "597.9MiB / 4GiB",
+      "container_memory_bytes": 626943590,
+      "processes": [
+        {
+          "pid": 1,
+          "VmHWM_bytes": 655360,
+          "VmRSS_bytes": 655360,
+          "cpu_seconds": 0.01
+        },
+        {
+          "pid": 7,
+          "VmHWM_bytes": 29671424,
+          "VmRSS_bytes": 29671424,
+          "cpu_seconds": 0.35
+        },
+        {
+          "pid": 9,
+          "VmHWM_bytes": 795508736,
+          "VmRSS_bytes": 735166464,
+          "cpu_seconds": 13.55
+        },
+        {
+          "pid": 10,
+          "VmHWM_bytes": 794804224,
+          "VmRSS_bytes": 762122240,
+          "cpu_seconds": 11.75
+        }
+      ]
+    }
+  ],
+  "resource_sampling_errors": [],
+  "peak_cpu_percent": 199.26,
+  "peak_sampled_container_memory_bytes": 720057139,
+  "peak_sampled_process_rss_bytes": 1604788224
+}

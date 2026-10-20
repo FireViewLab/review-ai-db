@@ -10,5 +10,6 @@ def model_free_prediction(monkeypatch):
     def prediction(content):
         return probability_result(.13)
 
-    monkeypatch.setattr("app.services.analysis.predict_text_score", prediction)
+    monkeypatch.setattr("app.services.analysis.predict_text_scores",
+                        lambda contents: [prediction(content) for content in contents])
     return prediction

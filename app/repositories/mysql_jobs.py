@@ -4,6 +4,7 @@ import os
 from contextlib import contextmanager
 from uuid import uuid4
 from app.repositories.idempotency import AnalysisClaim, existing_claim, request_hashes
+from app.repositories.job_migrations import require_explanation_policy_column, schema_lock
 
 
 class MySQLJobStore:
@@ -38,18 +39,24 @@ class MySQLJobStore:
             db.close()
 
     def initialize(self):
-        # 기존 팀 테이블은 변경하지 않는다. 별도 결과 테이블만 없으면 생성한다.
-        with self._connection() as db, db.cursor() as cursor:
-            cursor.execute("""CREATE TABLE IF NOT EXISTS ai_analysis_jobs (
+        # Serialize fresh-install CREATE/check across Workers; upgrades are explicit, never startup ALTER.
+        with self._connection() as db:
+            with schema_lock(db, self._settings["database"]) as cursor:
+                self._initialize_schema(cursor)
+
+    def _initialize_schema(self, cursor):
+        """Called with the schema advisory lock held, including by the explicit migrator."""
+        cursor.execute("""CREATE TABLE IF NOT EXISTS ai_analysis_jobs (
                 job_id VARCHAR(36) CHARACTER SET ascii COLLATE ascii_bin PRIMARY KEY,
                 status VARCHAR(16) NOT NULL,
                 request_json JSON NOT NULL,
                 result_json JSON NULL,
                 error_code VARCHAR(255) NULL,
+                explanation_policy_version VARCHAR(64) NULL DEFAULT NULL,
                 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""")
-            cursor.execute("""CREATE TABLE IF NOT EXISTS ai_analysis_idempotency (
+        cursor.execute("""CREATE TABLE IF NOT EXISTS ai_analysis_idempotency (
                 key_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin PRIMARY KEY,
                 payload_hash CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
                 job_id VARCHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL UNIQUE,
@@ -57,6 +64,7 @@ class MySQLJobStore:
                 created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (job_id) REFERENCES ai_analysis_jobs(job_id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4""")
+        require_explanation_policy_column(cursor, self._settings["database"])
 
     def claim_idempotent(self, key: str, payload: dict, versions: dict) -> AnalysisClaim:
         import pymysql
@@ -99,10 +107,10 @@ class MySQLJobStore:
             "UPDATE ai_analysis_jobs SET request_json=%s, updated_at=CURRENT_TIMESTAMP WHERE job_id=%s",
             (json.dumps(payload, ensure_ascii=False), job_id))
 
-    def complete(self, job_id: str, result: dict) -> None:
+    def complete(self, job_id: str, result: dict, *, explanation_policy_version: str | None = None) -> None:
         self._execute("""UPDATE ai_analysis_jobs SET status='DONE', result_json=%s,
-            error_code=NULL, updated_at=CURRENT_TIMESTAMP WHERE job_id=%s""",
-            (json.dumps(result, ensure_ascii=False), job_id))
+            explanation_policy_version=%s, error_code=NULL, updated_at=CURRENT_TIMESTAMP WHERE job_id=%s""",
+            (json.dumps(result, ensure_ascii=False), explanation_policy_version, job_id))
 
     def fail(self, job_id: str, code: str) -> None:
         self._execute("""UPDATE ai_analysis_jobs SET status='FAILED', error_code=%s,

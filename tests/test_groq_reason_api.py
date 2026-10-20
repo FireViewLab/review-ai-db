@@ -141,7 +141,7 @@ def test_disabled_naturalization_preserves_original_and_never_requests(api, monk
 def test_auth_and_health_do_not_call_groq_or_model(api, monkeypatch):
     client, store = api
     install_transport(monkeypatch, lambda request: pytest.fail("Auth/health made provider request"))
-    with patch("app.services.analysis.predict_text_score") as model, patch.object(store, "create") as create:
+    with patch("app.services.analysis.predict_text_scores") as model, patch.object(store, "create") as create:
         assert client.get("/health").status_code == 200
         assert client.post("/api/v1/data/analyze", json=body()).status_code == 401
         assert client.post("/experimental/analysis/collect/stream", json={"platform": "mall", "product_id": "0007"}).status_code == 401
@@ -218,6 +218,10 @@ def test_source_content_maps_by_review_id_if_analyzer_result_order_changes(api, 
 
 def test_mysql_json_receives_exact_naturalized_response(configured, monkeypatch):
     db = MagicMock()
+    db.cursor.return_value.__enter__.return_value.fetchone.return_value = {
+        "acquired": 1, "data_type": "varchar", "max_length": 64,
+        "is_nullable": "YES", "column_default": None,
+    }
     monkeypatch.setattr(pymysql, "connect", lambda **kwargs: db)
     store = MySQLJobStore(host="validation-only", port=3306, user="synthetic-user",
                           password="synthetic-password", database="validation-only")
@@ -232,7 +236,8 @@ def test_mysql_json_receives_exact_naturalized_response(configured, monkeypatch)
     sql, params = updates[0]
     assert "%s" in sql and MESSAGE not in sql
     assert json.loads(params[0]) == response.json()
-    assert params[1] == response.headers["X-Analysis-Job-ID"]
+    assert params[1] == "neutral-summary-v1"
+    assert params[2] == response.headers["X-Analysis-Job-ID"]
     assert_only_reasons_changed(before, response.json())
 
 

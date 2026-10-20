@@ -75,7 +75,7 @@ def test_rti_all_combinations(scores):
 
 
 def test_python_entry_point_contract_and_missing(monkeypatch):
-    monkeypatch.setattr("app.services.analysis.predict_text_score", lambda text: {"text_score":80 if text else -1})
+    monkeypatch.setattr("app.services.analysis.predict_text_scores", lambda texts: [{"text_score":80 if text else -1} for text in texts])
     result = analyze_reviews(platform="kurly", product_id="p", reviews=[
         {"review_id":"1", "content":"한 달 사용한 크림 후기입니다", "verified_purchase":False},
         {"review_id":"2", "content":"배송이 느리고 포장이 찢어져 왔습니다"},
@@ -110,8 +110,8 @@ def test_python_entry_point_contract_and_missing(monkeypatch):
 def test_python_entry_point_combines_text_behavior_and_network(monkeypatch):
     """Synthetic integration fixture; these are not production reviews."""
     monkeypatch.setattr(
-        "app.services.analysis.predict_text_score",
-        lambda content: {"text_score": 80.0},
+        "app.services.analysis.predict_text_scores",
+        lambda contents: [{"text_score": 80.0} for _ in contents],
     )
     review_date = datetime(2026, 9, 30, 12)
     reviews = [

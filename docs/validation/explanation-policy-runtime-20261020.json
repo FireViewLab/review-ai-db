@@ -1,0 +1,156 @@
+{
+  "environment": {
+    "platform": "linux",
+    "cpu_threads": 1,
+    "worker_count": 1,
+    "external_network_used": false,
+    "ptext_batch_size": 8,
+    "torch_version": "2.8.0+cpu"
+  },
+  "memory": {
+    "before_runtime_import": {
+      "VmSize_mib": 21.43,
+      "VmHWM_mib": 17.2,
+      "VmRSS_mib": 17.2,
+      "peak_rss_mib": 17.45
+    },
+    "before_model_load": {
+      "VmSize_mib": 591.3,
+      "VmHWM_mib": 225.34,
+      "VmRSS_mib": 225.34,
+      "peak_rss_mib": 225.34
+    },
+    "after_model_load": {
+      "VmSize_mib": 1288.38,
+      "VmHWM_mib": 348.35,
+      "VmRSS_mib": 348.35,
+      "peak_rss_mib": 348.35
+    },
+    "after_single_inference": {
+      "VmSize_mib": 1288.88,
+      "VmHWM_mib": 676.85,
+      "VmRSS_mib": 676.85,
+      "peak_rss_mib": 676.85
+    },
+    "after_3_reviews": {
+      "VmSize_mib": 1294.7,
+      "VmHWM_mib": 682.47,
+      "VmRSS_mib": 682.47,
+      "peak_rss_mib": 682.47
+    },
+    "final": {
+      "VmSize_mib": 1294.7,
+      "VmHWM_mib": 689.22,
+      "VmRSS_mib": 689.22,
+      "peak_rss_mib": 689.22
+    }
+  },
+  "checks": {
+    "startup_and_health_do_not_load_model": true,
+    "authentication_precedes_inference": true,
+    "retired_legacy_endpoint_404": true,
+    "real_single_review_missing_behavior_network": true,
+    "single_cached_model_across_service_api_sse": true,
+    "all_passed": true
+  },
+  "model_loading": {
+    "seconds": 1.5046,
+    "device": "cpu",
+    "threshold": 0.5,
+    "max_length": 256
+  },
+  "single_inference": {
+    "seconds": 0.0688,
+    "prediction": {
+      "text_score": 96,
+      "suspicious_probability": 0.0021753853652626276,
+      "predicted_label": "NORMAL"
+    }
+  },
+  "single_analysis": {
+    "review_id": "00:01",
+    "rti": 96.0,
+    "level": "safe",
+    "text_score": 96.0,
+    "behavior_score": -1.0,
+    "network_score": -1.0,
+    "reasons": []
+  },
+  "analysis_3": {
+    "seconds": 0.1447,
+    "result": {
+      "platform": "mall",
+      "product_id": "0007",
+      "review_count": 3,
+      "results": [
+        {
+          "review_id": "00:01",
+          "rti": 96.0,
+          "level": "safe",
+          "text_score": 96.0,
+          "behavior_score": -1.0,
+          "network_score": -1.0,
+          "reasons": []
+        },
+        {
+          "review_id": "00:02",
+          "rti": 96.0,
+          "level": "safe",
+          "text_score": 96.0,
+          "behavior_score": -1.0,
+          "network_score": -1.0,
+          "reasons": []
+        },
+        {
+          "review_id": "00:03",
+          "rti": 96.0,
+          "level": "safe",
+          "text_score": 96.0,
+          "behavior_score": -1.0,
+          "network_score": -1.0,
+          "reasons": []
+        }
+      ]
+    }
+  },
+  "normal_api": {
+    "seconds": 0.1644,
+    "status_code": 200,
+    "mysql_result_matches": true,
+    "stored_explanation_policy_version": "neutral-summary-v1"
+  },
+  "official_sse": {
+    "seconds": 0.1749,
+    "replay_seconds": 0.0286,
+    "api_result_identical": true,
+    "mysql_result_matches": true,
+    "replay_without_analysis": true,
+    "stored_explanation_policy_version": "neutral-summary-v1",
+    "contract_version": "v0.5",
+    "model_version": "ptext-koelectra-v1-2epoch-20260929",
+    "policy_version": "rti-v0.1"
+  },
+  "sse": {
+    "seconds": 0.1911,
+    "status_code": 200,
+    "events": [
+      "progress",
+      "progress",
+      "progress",
+      "result"
+    ],
+    "api_result_identical": true,
+    "mysql_result_matches": true,
+    "stored_explanation_policy_version": "neutral-summary-v1",
+    "authenticated_lookup_matches": true
+  },
+  "model_cache": {
+    "hits": 6,
+    "misses": 1,
+    "maxsize": 1,
+    "currsize": 1
+  },
+  "cleanup": {
+    "own_jobs_removed": 3
+  }
+}

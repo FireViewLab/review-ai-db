@@ -12,7 +12,7 @@ class JobStore(Protocol):
     def initialize(self) -> None: ...
     def create(self, payload: dict) -> str: ...
     def save_input(self, job_id: str, payload: dict) -> None: ...
-    def complete(self, job_id: str, result: dict) -> None: ...
+    def complete(self, job_id: str, result: dict, *, explanation_policy_version: str | None = None) -> None: ...
     def fail(self, job_id: str, code: str) -> None: ...
     def get(self, job_id: str) -> dict | None: ...
     def claim_idempotent(self, key: str, payload: dict, versions: dict) -> AnalysisClaim: ...
@@ -37,9 +37,16 @@ class SQLiteJobStore:
                 request_json TEXT NOT NULL,
                 result_json TEXT,
                 error_code TEXT,
+                explanation_policy_version TEXT DEFAULT NULL,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             )""")
+            # SQLite is for isolated tests/old local files; schema-only, no backfill.
+            db.execute("BEGIN IMMEDIATE")
+            if "explanation_policy_version" not in {
+                row["name"] for row in db.execute("PRAGMA table_info(ai_analysis_jobs)")
+            }:
+                db.execute("ALTER TABLE ai_analysis_jobs ADD COLUMN explanation_policy_version TEXT DEFAULT NULL")
             db.execute("""CREATE TABLE IF NOT EXISTS ai_analysis_idempotency (
                 key_hash TEXT PRIMARY KEY,
                 payload_hash TEXT NOT NULL,
@@ -81,12 +88,12 @@ class SQLiteJobStore:
                 (json.dumps(payload, ensure_ascii=False), job_id),
             )
 
-    def complete(self, job_id: str, result: dict) -> None:
+    def complete(self, job_id: str, result: dict, *, explanation_policy_version: str | None = None) -> None:
         with closing(self._connect()) as db, db:
             db.execute(
                 """UPDATE ai_analysis_jobs SET status='DONE', result_json=?,
-                error_code=NULL, updated_at=CURRENT_TIMESTAMP WHERE job_id=?""",
-                (json.dumps(result, ensure_ascii=False), job_id),
+                explanation_policy_version=?, error_code=NULL, updated_at=CURRENT_TIMESTAMP WHERE job_id=?""",
+                (json.dumps(result, ensure_ascii=False), explanation_policy_version, job_id),
             )
 
     def fail(self, job_id: str, code: str) -> None:

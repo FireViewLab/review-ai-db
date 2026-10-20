@@ -11,5 +11,6 @@ def model_free_core_prediction(monkeypatch):
             return unavailable_result()
         return probability_result(0.0)
 
-    monkeypatch.setattr("app.services.analysis.predict_text_score", prediction)
+    monkeypatch.setattr("app.services.analysis.predict_text_scores",
+                        lambda contents: [prediction(content) for content in contents])
     return prediction

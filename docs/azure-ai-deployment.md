@@ -1,6 +1,11 @@
 <!-- 새 Azure Ubuntu VM의 AI 서비스 최초 설치와 자동 배포 절차. -->
 # Azure for Students 배포
 
+Batch Inference 도입 후 실행 설정은 [Worker 병렬 처리 안내](worker-concurrency.md)를 따릅니다.
+현재 운영 후보는 `UVICORN_WORKERS=2`, CPU 스레드 1개씩, `PTEXT_BATCH_SIZE=8`입니다.
+Worker 1/2 성능 및 메모리 비교는 별도 실측 결과를 확인한 뒤 운영 적용합니다.
+아래 2026-10-02 검증 수치와 worker 1 기록은 당시 실행 조건입니다.
+
 2026-10-02의 KoELECTRA 통합은 로컬 검증 단계입니다. 아래 명령은 향후 배포 준비용이며
 이번 작업에서는 Azure 배포·commit/push를 실행하지 않습니다.
 [2차 통합 검증 보고서](validation/review-ai-runtime-integration-20261002.md)의 결과와 Data 계약 확인 후 적용합니다.
@@ -17,7 +22,8 @@ NSG 포트는 SSH 22와 AI HTTP 8000이며, 8000은 가능한 Data 서버 출발
 분석 API에 REQUIRE_INTERNAL_TOKEN=1 및 INTERNAL_TOKEN을 설정하고 TLS termination을 구성한다.
 접근 허용 범위는 팀에서 확정한다. /health는 인증 없는 프로세스 상태 확인용이다.
 `/health`는 모델을 lazy load하지 않으므로 health 성공만으로 모델 파일·추론 readiness를 판단하지 않는다.
-초기 후보는 2 vCPU / 4 GiB / worker 1이다. CPU 전용 이미지와 외부 모델 읽기 전용 마운트를 사용한다.
+2026-10-02 초기 후보는 2 vCPU / 4 GiB / worker 1이었다. 현재 Worker 2 후보는 같은 사양에서
+추가 검증해야 한다. CPU 전용 이미지와 외부 모델 읽기 전용 마운트를 사용한다.
 
 ## 모델과 환경변수 준비
 
@@ -31,15 +37,19 @@ VM의 `.env`에는 기존 DB·토큰·Data 설정과 함께 다음을 지정한�
 ```dotenv
 PTEXT_MODEL_HOST_PATH=/opt/review-ai-models/ptext-koelectra-v1-2epoch-20260929
 PTEXT_MODEL_PATH=/models/ptext-koelectra-v1-2epoch-20260929
-OMP_NUM_THREADS=2
-MKL_NUM_THREADS=2
+UVICORN_WORKERS=2
+OMP_NUM_THREADS=1
+MKL_NUM_THREADS=1
+PTEXT_BATCH_SIZE=8
 ENABLE_EXPERIMENTAL_COLLECTION=0
 REQUIRE_INTERNAL_TOKEN=1
 ```
 
 `PTEXT_MODEL_HOST_PATH`는 호스트 경로, `PTEXT_MODEL_PATH`는 컨테이너 경로다.
 Compose는 읽기 전용 bind mount를 사용하며 호스트 폴더가 없으면 자동 생성하지 않고 시작 실패한다.
-Dockerfile은 worker 1개, CPU torch 2.8.0+cpu·transformers 4.57.6 등 requirements-ml.txt의 고정 버전을 설치한다.
+Dockerfile은 기본 Worker 후보를 2개로 설정하고 Uvicorn의 `UVICORN_WORKERS` 환경변수를 사용한다.
+Worker 1 비교나 로컬 실행에는 `UVICORN_WORKERS=1`을 지정할 수 있다.
+CPU torch 2.8.0+cpu·transformers 4.57.6 등 requirements-ml.txt의 고정 버전을 설치한다.
 모델 캐시는 프로세스 단위이므로 worker를 추가하면 모델 메모리도 복제된다.
 코드의 CUDA 선택/CPU fallback은 유지하지만 기본 이미지는 CPU 전용이다.
 
@@ -101,7 +111,9 @@ VM에 DB·인증·외부 모델 설정을 직접 준비한다. CI 빌드는 모�
 CI 빌드의 임시 비밀번호는 배포에 사용되지 않는다. 기존 GitHub Actions 구조는 유지한다.
 선택적 Google 인증은 README의 읽기 전용 마운트를 사용한다.
 VM의 docker-compose.override.yml에 설정하면 자동 배포 명령에도 적용된다.
-컨테이너 교체 시 짧은 중단이 있을 수 있다.
+컨테이너 교체 시 중단이 있을 수 있다. Compose는 진행 중 작업의 정상 종료를 위해 최대 180초를
+기다린다. 강제 종료/OOM으로 남은 RUNNING은 자동 회수하지 않는다. 배포 전 유입을 멈추고
+진행 작업을 확인하는 절차와 잔류 작업 복구 제한은 [Worker 병렬 처리 안내](worker-concurrency.md)를 따른다.
 기존 VM의 DB/Redis 컨테이너·볼륨은 자동 삭제하지 않는다.
 
 ## 검증 상태

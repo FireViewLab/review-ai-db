@@ -72,11 +72,14 @@ def main() -> None:
     import httpx
     from fastapi.testclient import TestClient
     from app.analyzers import p_text
+    from app.core.analysis_versions import explanation_policy_version
     from app.core.crawler_settings import CrawlerSettings
     from app.factory import create_app
     from app.integrations.crawler_stream import CrawlerStreamClient, iter_sse_frames, stream_reviews_path
     from app.repositories.mysql_jobs import MySQLJobStore
     from app.services.analysis import analyze_reviews
+
+    report["environment"]["ptext_batch_size"] = p_text.configured_batch_size()
 
     torch.set_num_threads(args.cpu_threads)
     torch.set_num_interop_threads(1)
@@ -134,6 +137,15 @@ def main() -> None:
             report["analysis_3"] = {"seconds": seconds, "result": expected}
             report["memory"]["after_3_reviews"] = memory_snapshot()
 
+            # Scoring parity uses raw rows above. API adds only the neutral empty-evidence notice.
+            from copy import deepcopy
+            from app.contracts.data_ai_v05 import DataReviewResultV05
+            from app.services.reason_explanations import build_explanation_context, neutral_reasons
+            expected = deepcopy(expected)
+            for row in expected["results"]:
+                if not row["reasons"]:
+                    row["reasons"] = neutral_reasons(build_explanation_context(DataReviewResultV05.model_validate(row)))
+
             for count in (10, 100):
                 if count > args.max_reviews:
                     continue
@@ -178,10 +190,12 @@ def main() -> None:
             assert normal.json() == expected
             saved = store.get(job_ids[-1])
             assert saved["status"] == "DONE" and saved["result"] == normal.json()
+            assert saved["explanation_policy_version"] == explanation_policy_version()
             assert saved["request"]["product_id"] == "0007"
             assert [row["review_id"] for row in saved["request"]["reviews"]] == [row["review_id"] for row in sample_reviews]
             report["normal_api"] = {"seconds": seconds, "status_code": normal.status_code,
-                                     "mysql_result_matches": True}
+                                     "mysql_result_matches": True,
+                                     "stored_explanation_policy_version": saved["explanation_policy_version"]}
 
             from uuid import uuid4
             from unittest.mock import patch
@@ -200,7 +214,9 @@ def main() -> None:
                             for name, data in events if name == "result"]
             assert wire_results == expected["results"]
             assert events[-1][0] == "done" and events[-1][1]["result_count"] == 3
-            assert store.get(job_ids[-1])["result"] == expected
+            before_replay = store.get(job_ids[-1])
+            assert before_replay["result"] == expected
+            assert before_replay["explanation_policy_version"] == explanation_policy_version()
             with patch("app.services.data_analysis_stream.evaluate_data_and_store",
                        side_effect=AssertionError("Replay must not infer")) as forbidden:
                 replay, replay_seconds = timed(lambda: client.post(
@@ -210,9 +226,12 @@ def main() -> None:
                                  for frame in iter_sse_frames(replay.text.splitlines())]
                 assert replay_events == [event for event in events if event[0] != "progress"]
                 forbidden.assert_not_called()
+                assert store.get(job_ids[-1]) == before_replay
             report["official_sse"] = {"seconds": seconds, "replay_seconds": replay_seconds,
                                       "api_result_identical": True, "mysql_result_matches": True,
-                                      "replay_without_analysis": True, **analysis_versions()}
+                                      "replay_without_analysis": True,
+                                      "stored_explanation_policy_version": before_replay["explanation_policy_version"],
+                                      **analysis_versions()}
 
             stream_body = "".join(
                 "event: review\ndata: " + json.dumps({**row, "platform": "mall", "product_id": "0007"}, ensure_ascii=False) + "\n\n"
@@ -243,6 +262,7 @@ def main() -> None:
                 assert crawler_calls == [stream_reviews_path("mall", "0007")]
                 saved = store.get(job_ids[-1])
                 assert saved["status"] == "DONE" and saved["result"] == expected
+                assert saved["explanation_policy_version"] == explanation_policy_version()
                 lookup_path = "/experimental/analysis/jobs/" + job_ids[-1]
                 assert client.get(lookup_path).status_code == 401
                 lookup = client.get(lookup_path, headers=headers)
@@ -250,6 +270,7 @@ def main() -> None:
                 report["sse"] = {"seconds": seconds, "status_code": stream.status_code,
                                   "events": [frame.event for frame in frames],
                                   "api_result_identical": True, "mysql_result_matches": True,
+                                  "stored_explanation_policy_version": saved["explanation_policy_version"],
                                   "authenticated_lookup_matches": True}
             finally:
                 client.portal.call(async_http.aclose)

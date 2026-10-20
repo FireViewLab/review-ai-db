@@ -1,0 +1,31 @@
+# Disposable benchmark only. NEVER include this override in production deployment.
+# Apply after docker-compose.yml and docker-compose.validation.yml with project review-ai-runtime-check.
+services:
+  ai:
+    command: ["uvicorn", "scripts.benchmark_worker_app:create_benchmark_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      BENCHMARK_DISPOSABLE: "1"
+      BENCHMARK_USE_SINGLE: ${BENCHMARK_USE_SINGLE:-0}
+      PYTHON_DOTENV_DISABLED: "1"
+      ENABLE_GROQ_REASON_NATURALIZATION: "0"
+      ENABLE_EXPERIMENTAL_COLLECTION: "0"
+    volumes:
+      # Include legacy test imports only in this disposable validation mount.
+      - type: bind
+        source: ./ai
+        target: /service/ai
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./scripts
+        target: /service/scripts
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ./tests
+        target: /service/tests
+        read_only: true
+        bind:
+          create_host_path: false
