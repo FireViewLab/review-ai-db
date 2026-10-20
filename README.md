@@ -52,8 +52,8 @@ $env:ENABLE_EXPERIMENTAL_COLLECTION = "0"
 $env:GOOGLE_APPLICATION_CREDENTIALS = ""
 # 외부 모델 폴더의 실제 경로로 바꿉니다. 모델 파일을 저장소에 복사하지 않습니다.
 $env:PTEXT_MODEL_PATH = "C:/models/ptext-koelectra-v1-2epoch-20260929"
-$env:OMP_NUM_THREADS = "2"
-$env:MKL_NUM_THREADS = "2"
+$env:OMP_NUM_THREADS = "1"
+$env:MKL_NUM_THREADS = "1"
 .\.venv\Scripts\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8000 --workers 1
 ```
 
@@ -66,7 +66,7 @@ if [ ! -d .venv ]; then python3.12 -m venv .venv; fi
 docker compose up -d ai-db
 ENABLE_EXPERIMENTAL_COLLECTION=0 GOOGLE_APPLICATION_CREDENTIALS="" \
   PTEXT_MODEL_PATH=/absolute/models/ptext-koelectra-v1-2epoch-20260929 \
-  OMP_NUM_THREADS=2 MKL_NUM_THREADS=2 \
+  OMP_NUM_THREADS=1 MKL_NUM_THREADS=1 \
   .venv/bin/python -m uvicorn main:app --host 127.0.0.1 --port 8000 --workers 1
 ```
 
@@ -223,11 +223,13 @@ docker compose logs --tail 50 ai
 
 Docker에는 AI 서비스와 MySQL 8.0이 있으며 AI 프로세스는 비-root 사용자로 실행합니다.
 소스·실행 의존성만 복사하고 .env, 데이터, 팀원 DB, artifacts, 크롤링 도구는 제외합니다.
-production에서는 reload를 사용하지 않으며 `UVICORN_WORKERS`로 Worker 수를 설정합니다(기본 후보 2).
-`PTEXT_BATCH_SIZE`는 1~32, 기본 8이며 Text 텐서 배치만 제어합니다. Network는 상품 리뷰 전체를 비교합니다.
-OMP/MKL 스레드 기본값은 각각 1입니다. [Worker·종료 안내](docs/worker-concurrency.md)를 참고하세요.
+production에서는 reload를 사용하지 않으며 `UVICORN_WORKERS`로 독립 Uvicorn 프로세스 수를 설정합니다(기본 2).
+앞의 로컬 빠른 시작 예시는 Worker 1개를 사용합니다.
+`OMP_NUM_THREADS`와 `MKL_NUM_THREADS`는 각 프로세스에서 사용하는 CPU 연산 라이브러리의 병렬 스레드 설정이며 기본값은 각각 1입니다.
+`PTEXT_BATCH_SIZE`는 한 번에 KoELECTRA 모델로 전달하는 리뷰 개수이며 1~32, 기본 8입니다.
+Text 텐서 배치만 제어하며 Network는 상품 리뷰 전체를 비교합니다. [Worker·종료 안내](docs/worker-concurrency.md)를 참고하세요.
 `requirements-ml.txt`의 CPU 전용 torch와
-transformers를 설치하며 OMP/MKL 스레드는 기본 2개입니다. 모델 lazy loading·프로세스 내 캐시·RLock을 유지합니다.
+transformers를 설치하며 모델 lazy loading·프로세스 내 캐시·RLock을 유지합니다.
 모델 파일은 이미지/Git에 포함하지 않습니다. CPU 이미지와 별개로 코드의 CUDA 자동 선택/CPU fallback 경로는 보존합니다.
 MySQL은 기존 `ai-db-data` 볼륨(`/var/lib/mysql`)을 재사용합니다.
 Compose 프로젝트 이름을 바꾸면 다른 볼륨이 생성되므로 기존 프로젝트 이름을 유지하세요.
