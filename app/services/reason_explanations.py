@@ -1,13 +1,13 @@
 """기존 근거와 확정 점수를 보존하고 빈 reasons에만 중립적인 점수 안내를 만든다."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
 from app.contracts.data_ai_v05 import DataReviewResultV05
+from app.core.analysis_versions import EXPLANATION_POLICY_VERSION, explanation_policy_version
 
 
-# 설명 문구 정책은 모델/RTI 정책과 독립적이다. 외부 v0.5 필드를 추가하지 않는다.
-EXPLANATION_POLICY_VERSION = "neutral-summary-v1"
+# The constant is re-exported for existing internal imports; core owns the single definition.
 
 SAFE_MESSAGE = (
     "현재 계산 가능한 신호를 기준으로 신뢰 점수가 높은 구간에 해당합니다. "
@@ -49,7 +49,7 @@ class ReviewExplanationContext:
     rti: float
     level: Literal["safe", "warn", "danger"] | None
     signals: tuple[ExplanationSignal, ...]
-    explanation_policy_version: str = EXPLANATION_POLICY_VERSION
+    explanation_policy_version: str = field(default_factory=explanation_policy_version)
 
 
 def build_explanation_context(result: DataReviewResultV05) -> ReviewExplanationContext:

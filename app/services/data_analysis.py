@@ -2,6 +2,7 @@
 import logging
 
 from app.contracts.data_ai_v05 import DataAnalyzeRequestV05, DataAnalyzeResponseV05
+from app.core.analysis_versions import explanation_policy_version
 from app.integrations.groq_reason_naturalizer import naturalize_reasons_batch
 from app.repositories.analysis_jobs import JobStore
 from app.services.analysis import analyze_reviews
@@ -13,6 +14,7 @@ LOGGER = logging.getLogger(__name__)
 def evaluate_data_and_store(store: JobStore, job_id: str,
                             payload: DataAnalyzeRequestV05) -> DataAnalyzeResponseV05:
     try:
+        applied_explanation_version = explanation_policy_version()
         # 운영 입력 계약은 그대로 유지한다. rating/written_at만으로 행동 근거를 만들지 않는다.
         # 실제로 제공되는 행동 evidence 확장은 Data 팀과 입력 계약을 합의한 뒤 연결한다.
         evaluated = analyze_reviews(
@@ -48,7 +50,8 @@ def evaluate_data_and_store(store: JobStore, job_id: str,
             if not context.raw_reason_codes:
                 result["reasons"] = neutral_reasons(context)
         response = DataAnalyzeResponseV05.model_validate(explained)
-        store.complete(job_id, response.model_dump(mode="json"))
+        store.complete(job_id, response.model_dump(mode="json"),
+                       explanation_policy_version=applied_explanation_version)
         return response
     except Exception:
         try:

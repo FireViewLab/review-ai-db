@@ -32,6 +32,7 @@ API 계약 확정을 의미하지 않습니다. 세부 동작은 같은 브랜�
 | [Groq reasons 한국어 후처리](groq-reason-naturalization.md) | 기본 OFF인 reasons 전용 후처리, 환경변수·배치·시간 제한·키 전환·코드 fallback·외부 전송 범위 |
 | [Worker 병렬 처리](worker-concurrency.md) | Worker 1/2, CPU 스레드·Text batch 설정, 정상 종료·잔류 RUNNING 복구 한계 |
 | [빈 reasons 중립 안내](reason-explanations.md) | 원본 근거 보존, 신규 결과 점수/가용성 안내, 설명 정책·DONE replay |
+| [설명 정책 DB 마이그레이션](explanation-policy-migration.md) | 작업 단위 설명 버전 영속화, 기존 MySQL의 명시적 업그레이드·재실행·복구, 과거 NULL 보존 |
 | [P_text parity 기준](ptext_batch_parity_test_plan.md) | 원본 단건 Golden과 배치의 점수·label·RTI·순서·truncation 검증 기준 |
 
 현재 브랜치의 핵심 구분:

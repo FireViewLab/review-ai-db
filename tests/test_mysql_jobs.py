@@ -30,6 +30,10 @@ def test_mysql_env(monkeypatch):
 @pytest.fixture
 def fake_db(monkeypatch):
     db = MagicMock()
+    db.cursor.return_value.__enter__.return_value.fetchone.return_value = {
+        "acquired": 1, "data_type": "varchar", "max_length": 64,
+        "is_nullable": "YES", "column_default": None,
+    }
     connect = MagicMock(return_value=db)
     monkeypatch.setattr(pymysql, "connect", connect)
     store = MySQLJobStore(host="db", port=3306, user="ai",
@@ -60,7 +64,8 @@ def test_complete_preserves_numeric_unavailable_and_null_level(fake_db):
     sql, params = db.cursor.return_value.__enter__.return_value.execute.call_args.args
     assert "result_json=%s" in sql
     assert json.loads(params[0]) == response
-    assert params[1] == "job"
+    assert params[1] is None  # Older callers do not guess a historical explanation version.
+    assert params[2] == "job"
     db.commit.assert_called_once()
 
 

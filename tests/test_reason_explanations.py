@@ -214,7 +214,7 @@ def test_neutral_explanation_does_not_hide_storage_failure(api, monkeypatch):
     assert response.status_code == 503 and "results" not in response.json()
 
 
-def test_mysql_receives_same_final_reason_json_without_schema_changes(monkeypatch):
+def test_mysql_receives_same_final_reason_json_with_pipeline_metadata(monkeypatch):
     monkeypatch.setenv("PYTHON_DOTENV_DISABLED", "1")
     monkeypatch.setenv("ENABLE_GROQ_REASON_NATURALIZATION", "0")
     db = MagicMock()
@@ -230,5 +230,7 @@ def test_mysql_receives_same_final_reason_json_without_schema_changes(monkeypatc
     sql, params = updates[0]
     assert SAFE_MESSAGE not in sql
     assert json.loads(params[0]) == final.model_dump(mode="json")
+    assert params[1] == EXPLANATION_POLICY_VERSION
+    assert params[2] == "test-job"
     assert final.results[0].reasons == [SAFE_MESSAGE, PARTIAL_SIGNALS_MESSAGE]
     assert_scores_and_shape_unchanged(raw, final.model_dump(mode="json"))
