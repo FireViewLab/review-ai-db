@@ -1,0 +1,176 @@
+# GCP only: manual preparation for the post-cut-over VM. Never changes Azure or DNS.
+# Provision the VM before dispatching. Required prerequisites (not configured here):
+# - VM/project enable-oslogin=TRUE, Google guest environment, IAP -> VM tcp:22 firewall.
+# - WIF principal -> deployer SA: roles/iam.workloadIdentityUser, restricted to this repo/main.
+# - Deployer SA: IAP tunnel access, Compute viewer, OS Admin Login; if the VM has an SA,
+#   also roles/iam.serviceAccountUser on that VM's service account (not project-wide).
+# - reviewadmin owns the existing main checkout and can run sudo -n docker;
+#   non-interactive GitHub read access, Docker Compose v2, curl, .env and external model exist.
+# - Keep the existing Compose project/overrides, model mount and MySQL volume/schema.
+#   Schema upgrades, backups, HTTPS/DNS and cut-over remain separate operator tasks.
+# - Enable the Compute/OS Login/IAP/STS/IAM Credentials APIs in advance.
+# This file must eventually exist on main to dispatch successfully. A future main push
+# still triggers the existing Azure ci.yml; this workflow does not disable or alter it.
+# OS Login uses the SA's POSIX username, not reviewadmin. Switch users only after SSH.
+# gcloud manages first-use SSH host trust over the explicitly targeted IAP tunnel;
+# establish a host-key pinning policy when provisioning the production VM.
+name: GCP AI Manual Deploy
+
+run-name: GCP AI ${{ inputs.mode }} by @${{ github.actor }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'verify checks SSH/Docker only; deploy updates the existing main checkout'
+        required: true
+        type: choice
+        default: verify
+        options:
+          - verify
+          - deploy
+
+permissions:
+  contents: read
+  id-token: write
+
+# Independent from Azure's azure-ai-production group. Never cancel an active deployment.
+concurrency:
+  group: gcp-ai-production
+  cancel-in-progress: false
+
+jobs:
+  gcp:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.repository == 'FireViewLab/review-ai-db' &&
+      github.ref == 'refs/heads/main' &&
+      (inputs.mode == 'verify' || inputs.mode == 'deploy')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GCP_PROJECT_ID: project-8eb707d8-f69d-4cdb-930
+      GCP_ZONE: asia-northeast3-a
+      GCP_INSTANCE: review-ai-gcp-prod
+      CLOUDSDK_CORE_DISABLE_PROMPTS: '1'
+      DEPLOY_MODE: ${{ inputs.mode }}
+    steps:
+      # Required before auth; no checkout credentials are persisted or sent to the VM.
+      - name: Checkout workflow source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Authenticate to GCP using GitHub OIDC
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
+        with:
+          project_id: ${{ env.GCP_PROJECT_ID }}
+          workload_identity_provider: projects/158603754088/locations/global/workloadIdentityPools/github-actions-pool/providers/github-provider
+          service_account: github-actions-deployer@project-8eb707d8-f69d-4cdb-930.iam.gserviceaccount.com
+          # This is short-lived WIF configuration, NOT a service-account JSON key.
+          # It stays on the ephemeral runner, is never copied to the VM or built into an image.
+          create_credentials_file: true
+          export_environment_variables: true
+          cleanup_credentials: true
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+        with:
+          version: '>= 416.0.0'
+
+      - name: Verify or deploy through IAP and OS Login
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$DEPLOY_MODE" in
+            verify|deploy) ;;
+            *) echo 'Unsupported operation' >&2; exit 1 ;;
+          esac
+
+          # A fresh runner-only key; no stored SSH password or long-lived private key.
+          umask 077
+          ssh_key="$RUNNER_TEMP/gcp_deploy_ssh"
+          trap 'rm -f -- "$ssh_key" "$ssh_key.pub"' EXIT
+          ssh-keygen -q -t ed25519 -N '' -C 'github-actions-gcp-deploy' -f "$ssh_key"
+
+          # Do not prefix the VM with reviewadmin@: gcloud resolves the OS Login account.
+          # Connect immediately after auth/setup; the remote build needs no cloud credentials.
+          gcloud compute ssh "$GCP_INSTANCE" \
+            --project="$GCP_PROJECT_ID" \
+            --zone="$GCP_ZONE" \
+            --tunnel-through-iap \
+            --quiet \
+            --ssh-key-file="$ssh_key" \
+            --ssh-key-expire-after=30m \
+            --ssh-flag='-oBatchMode=yes' \
+            --ssh-flag='-oConnectTimeout=30' \
+            --ssh-flag='-oConnectionAttempts=1' \
+            --ssh-flag='-oServerAliveInterval=15' \
+            --ssh-flag='-oServerAliveCountMax=3' \
+            --command="sudo -n -H -u reviewadmin bash -se -- '$DEPLOY_MODE'" <<'REMOTE_SCRIPT'
+          set -euo pipefail
+          mode="$1"
+          case "$mode" in
+            verify|deploy) ;;
+            *) echo 'Unsupported remote operation' >&2; exit 1 ;;
+          esac
+          cd /home/reviewadmin/review-ai-db
+          test "$(git branch --show-current)" = main
+          if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+            echo 'Refusing to deploy a checkout with tracked local changes' >&2
+            exit 1
+          fi
+          test -f .env
+          command -v curl >/dev/null
+          sudo -n docker version --format '{{.Server.Version}}'
+          sudo -n docker compose version
+          # Quiet validation only: never print expanded environment values.
+          if ! sudo -n docker compose config --quiet >/dev/null 2>&1; then
+            echo 'Compose configuration is invalid; inspect it securely on the VM' >&2
+            exit 1
+          fi
+          if [ "$mode" = verify ]; then
+            echo 'GCP SSH, application checkout and Docker Compose verification passed (no redeploy)'
+            exit 0
+          fi
+
+          export GIT_TERMINAL_PROMPT=0
+          export GIT_SSH_COMMAND='ssh -oBatchMode=yes'
+          # Use the VM owner's existing Git credentials, never the Actions checkout token.
+          # Suppress Git errors too: a misconfigured remote URL could contain credentials.
+          if ! git pull --ff-only origin main >/dev/null 2>&1; then
+            echo 'Fast-forward Git pull failed; inspect branch/access securely on the VM' >&2
+            exit 1
+          fi
+          # ff-only can also succeed when local main is ahead; do not deploy local-only commits.
+          if [ "$(git rev-parse HEAD)" != "$(git rev-parse FETCH_HEAD)" ]; then
+            echo 'Local main differs from the fetched main commit; deployment was not started' >&2
+            exit 1
+          fi
+          printf 'Deploying main commit: %s\n' "$(git rev-parse HEAD)"
+          if ! sudo -n docker compose config --quiet >/dev/null 2>&1; then
+            echo 'Updated Compose configuration is invalid; deployment was not started' >&2
+            exit 1
+          fi
+          # Preserve .env, project identity, external model mount and existing database volumes.
+          if ! sudo -n docker compose up -d --build; then
+            echo 'Docker Compose deployment failed' >&2
+            sudo -n docker compose ps || true
+            exit 1
+          fi
+
+          # Explicit retry includes startup connection resets, refusals, timeouts and HTTP errors.
+          for attempt in $(seq 1 18); do
+            if curl --fail --silent --show-error --connect-timeout 5 --max-time 10 \
+              http://127.0.0.1:8000/health >/dev/null 2>&1; then
+              echo 'GCP AI health check passed'
+              exit 0
+            fi
+            printf 'Health check not ready (attempt %s/18)\n' "$attempt"
+            if [ "$attempt" -lt 18 ]; then sleep 5; fi
+          done
+          echo 'GCP AI health check failed after retries' >&2
+          sudo -n docker compose ps || true
+          # Do not dump .env, docker inspect, expanded compose config or application logs.
+          exit 1
+          REMOTE_SCRIPT
