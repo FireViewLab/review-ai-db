@@ -1,5 +1,5 @@
-# main의 테스트 통과 후 새 Azure Ubuntu VM에 독립 AI 서비스를 배포한다.
-name: Azure AI Deploy
+# main/PR의 테스트와 이미지 빌드만 검증한다. 배포는 GCP 수동 워크플로로 분리한다.
+name: AI CI
 on:
   push:
     branches: ["main"]
@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: azure-ai-production
+  group: ai-ci
   cancel-in-progress: false
 
 jobs:
@@ -29,31 +29,3 @@ jobs:
       - run: docker compose build
         env:
           DB_PASSWORD: ci-config-only-not-for-deployment
-
-  deploy:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy over SSH
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.AZURE_HOST }}
-          username: ${{ secrets.AZURE_USER }}
-          password: ${{ secrets.AZURE_PASSWORD }}
-          port: 22
-          script: |
-            set -eu
-            cd /home/reviewadmin/review-ai-db
-            test "$(git branch --show-current)" = main
-            git pull --ff-only origin main
-            sudo docker compose up -d --build
-            if ! curl --fail --silent --show-error \
-              --connect-timeout 5 --max-time 10 \
-              --retry 12 --retry-delay 5 --retry-connrefused --retry-all-errors \
-              http://localhost:8000/health; then
-              echo "AI health check failed after retries" >&2
-              sudo docker compose ps || true
-              sudo docker compose logs --no-color --tail 200 ai || true
-              exit 1
-            fi

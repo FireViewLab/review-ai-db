@@ -9,8 +9,8 @@
 # - Keep the existing Compose project/overrides, model mount and MySQL volume/schema.
 #   Schema upgrades, backups, HTTPS/DNS and cut-over remain separate operator tasks.
 # - Enable the Compute/OS Login/IAP/STS/IAM Credentials APIs in advance.
-# This file must eventually exist on main to dispatch successfully. A future main push
-# still triggers the existing Azure ci.yml; this workflow does not disable or alter it.
+# This file must eventually exist on main to dispatch successfully. ci.yml runs tests
+# only; production deployment requires an explicit workflow_dispatch from main.
 # OS Login uses the SA's POSIX username, not reviewadmin. Switch users only after SSH.
 # gcloud manages first-use SSH host trust over the explicitly targeted IAP tunnel;
 # establish a host-key pinning policy when provisioning the production VM.
@@ -34,7 +34,7 @@ permissions:
   contents: read
   id-token: write
 
-# Independent from Azure's azure-ai-production group. Never cancel an active deployment.
+# Independent from test-only CI. Never cancel an active deployment.
 concurrency:
   group: gcp-ai-production
   cancel-in-progress: false
