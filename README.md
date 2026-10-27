@@ -1,9 +1,9 @@
-# Re:view AI 분석·저장 서비스 (수집/SSE 통합 준비)
+# Re:view AI 분석·저장 서비스
 
 Data 서버가 HTTP로 전달한 리뷰를 분석해 JSON을 반환합니다.
 분석 결과는 AI 자체 MySQL DB에 먼저 저장합니다. Redis는 사용하지 않습니다.
 `FireViewLab/review-ai-new` main(`ff3c149`)에서 검증한 KoELECTRA·행동·네트워크 런타임을
-기존 운영 구조에 통합하는 로컬 검증 단계입니다. 공식 분석 경로는 `POST /api/v1/data/analyze`입니다.
+기존 운영 구조에 통합한 서비스입니다. 공식 JSON 분석 경로는 `POST /api/v1/data/analyze`입니다.
 새 연동은 [v0.5 API·인증·계산 정책](docs/data-ai-v05-integration.md)을 먼저 확인하세요.
 Data가 리뷰를 POST하고 리뷰별 SSE를 받는 신규 공식 경로는 `POST /api/v1/data/analyze/stream`입니다.
 [POST→SSE 계약·헤더·DB idempotency·재시도 안내](docs/data-analysis-stream.md)를 참고하세요. 기존 JSON API는 그대로 유지합니다.
@@ -114,19 +114,26 @@ macOS/Linux에서는 Swagger UI의 `POST /api/v1/data/analyze` → **Try it out*
 기본 저장소는 MySQL의 `review_system.ai_analysis_jobs`입니다.
 `DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME`으로 접속하며, 시작 시 테이블이 없으면 생성합니다.
 접속 실패 시 시작을 중단합니다. SQLite 자동 대체는 없고 `AI_RESULT_DB_PATH`는 사용하지 않습니다.
+기존 작업 테이블에 `explanation_policy_version` 컬럼이 없다면 새 서버 기동 전에
+[명시적 DB 마이그레이션](docs/explanation-policy-migration.md)이 필요합니다. Worker 시작 중
+자동 ALTER나 과거 결과의 설명 버전 backfill은 하지 않습니다.
 기존 팀 테이블은 변경하지 않으며, 과거 SQLite 데이터도 삭제하거나 자동 이관하지 않습니다.
 정상 분석 응답은 결과의 DB 커밋이 완료된 뒤 반환됩니다.
 작업 ID 헤더는 저장 기록 식별용이며, 기본 API에는 공개 결과 조회 경로가 없습니다.
 
 ## API
 
-운영 Swagger에는 다음 두 경로만 표시됩니다 (`ENABLE_EXPERIMENTAL_COLLECTION=0`).
+기본 설정의 Swagger에는 다음 세 공식 경로가 표시됩니다 (`ENABLE_EXPERIMENTAL_COLLECTION=0`).
 
 - `GET /health`: `{"status":"ok"}` (프로세스 liveness, 모델 lazy load/readiness 검사는 아님)
 - `POST /api/v1/data/analyze`: Data/AI v0.5 공식 리뷰 배치 분석
+- `POST /api/v1/data/analyze/stream`: 같은 요청 body로 분석하고 리뷰별 최종 결과를 SSE로 전달
 
 `/docs`, `/redoc`, `/openapi.json`은 API 문서이며 `/`는 문서 화면으로 이동합니다.
 토큰을 설정한 경우 분석 요청에 `X-Internal-Token` 헤더가 필요합니다.
+공식 SSE에는 추가로 비어 있지 않은 `X-Request-ID`와 `Idempotency-Key` 헤더가 필수입니다.
+동일 키·동일 요청의 완료 결과는 DB에서 replay하며 재분석하지 않습니다. 성공 완료는 `done`
+이벤트 수신으로 판단합니다. [SSE 이벤트·충돌·재시도 계약](docs/data-analysis-stream.md)을 확인하세요.
 
 요청 예시:
 
@@ -203,6 +210,10 @@ macOS/Linux에서는 `.venv/bin/python -m pytest -q`를 사용합니다.
 2026-10-02 로컬 통합 검증은 Windows와 Docker Linux에서 각각 전체 pytest **327개 통과**입니다.
 실제 KoELECTRA CPU 추론·일반 API·MySQL 저장과 Docker config/build/up/healthy를 확인했습니다.
 SSE는 실제 모델·MySQL과 모의 HTTPS Data 전송을 사용해 API/저장 결과 일치를 검증했으며 실제 Data 서버 왕복 검증은 남아 있습니다.
+이후 2026-10-20 설명 정책 버전 영속화 검증에서는 Windows·Docker Linux 각각 전체 **584개 통과**와
+Golden 18건 parity, Worker 2 및 실제 MySQL 저장을 확인했습니다.
+[해당 검증 보고서](docs/validation/explanation-policy-persistence-20261020.md)는 당시 환경과 실행 결과 기록이며,
+현재 운영 서버의 상태나 이번 문서 변경의 재검증 결과를 뜻하지 않습니다.
 
 Docker Desktop의 **Linux 엔진** 또는 Linux Docker Engine이 실행 중이어야 합니다.
 로컬 Uvicorn이 8000 포트를 쓰고 있다면 먼저 종료하세요.
@@ -239,6 +250,25 @@ MySQL 호스트 포트는 기본 `127.0.0.1:3307`이며 외부 네트워크에 �
 이 구성은 별도 계정을 자동 생성하지 않습니다. 기존 `ai-results` SQLite 볼륨은 삭제하지 않습니다.
 일반 `docker compose down`은 볼륨을 유지하지만 **`docker compose down -v`는 결과 볼륨을
 삭제하므로 사용하지 마세요.** 볼륨 보존과 별도로 운영 백업이 필요합니다.
+
+## CI와 GCP 수동 배포
+
+- [CI 워크플로](.github/workflows/ci.yml)는 main push와 main 대상 PR에서 pytest,
+  Compose 설정 검사·이미지 빌드만 수행합니다. Azure SSH 배포 job은 제거했습니다.
+- [GCP 워크플로](.github/workflows/gcp-deploy.yml)는 `workflow_dispatch` 수동 실행 전용입니다.
+  `FireViewLab/review-ai-db`의 main에서 실행할 때만 작업하며, push/PR로 배포하지 않습니다.
+  기본 모드 `verify`는 SSH·체크아웃·Docker Compose 사용 가능 여부만 확인하고 재배포하지 않습니다.
+  `deploy`를 명시적으로 선택하면 fast-forward pull → Compose 재배포 → health 재시도를 수행합니다.
+
+대상 VM은 `review-ai-gcp-prod`, 영역은 `asia-northeast3-a`이며 WIF/OIDC와 IAP·OS Login을 사용합니다.
+VM의 OS Login 활성화, IAP 방화벽·IAM/WIF 바인딩·필수 API, `reviewadmin`의 비대화형 Git 접근과
+`sudo docker` 권한을 먼저 확인해야 합니다. 워크플로의 존재만으로 이 설정이나 실제 배포 완료를 보장하지 않습니다.
+SSH host-key 고정 정책도 VM 준비 시 확인하세요.
+
+VM의 기존 `.env`, Compose 프로젝트명·override, 외부 모델 마운트와 MySQL 볼륨을 유지합니다.
+워크플로는 DB 마이그레이션·초기화, VM 생성/재시작, DNS 변경이나 cut-over를 수행하지 않습니다.
+기존 DB의 스키마 호환과 백업은 배포 전에 별도로 확인하세요. 과거 Azure 설정은
+[Azure 배포 안내](docs/azure-ai-deployment.md)를 참고하되 현재 자동 배포 절차로 적용하지 마세요.
 
 ## 실험적 수집/SSE
 
@@ -294,9 +324,10 @@ export GOOGLE_CREDENTIALS_FILE=/absolute/secure/google-credentials.json
 sudo --preserve-env=GOOGLE_CREDENTIALS_FILE docker compose -f docker-compose.yml -f compose.google.yml up -d --build
 ```
 
-자동 배포에도 사용하려면 VM의 docker-compose.override.yml에 같은 읽기 전용
+이 과거 모듈 설정을 별도 VM 실행에도 사용하려면 docker-compose.override.yml에 같은 읽기 전용
 마운트와 GOOGLE_APPLICATION_CREDENTIALS 설정을 추가합니다.
 실제 인증 파일은 VM에 보관하며 GitHub workflow는 .env를 생성하거나 덮어쓰지 않습니다.
 
-새 VM 설치와 배포 절차: [Azure 배포 안내](docs/azure-ai-deployment.md).
+현재 CI·배포 방식은 위의 **CI와 GCP 수동 배포** 절을 확인하세요.
+과거 Azure VM 설치 참고: [Azure 배포 안내](docs/azure-ai-deployment.md).
 전환 분석과 보존/종료 범위: [독립 서비스 전환 기록](docs/ai-service-migration.md).
