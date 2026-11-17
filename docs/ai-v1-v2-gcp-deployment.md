@@ -4,13 +4,35 @@
 
 현재 저장소의 GCP workflow는 `review-ai-gcp-prod` (`asia-northeast3-a`)에 IAP/OS Login으로 접속해
 `/home/reviewadmin/review-ai-db`에서 **기본 Compose**를 사용합니다. workflow는 수정하지 않았습니다.
-2026-11-17 실제 운영 관측값은 아래와 같습니다. 디스크 여유, live `.env` 전체, 현재 모델 호스트 절대 경로는 확인되지 않았습니다.
+2026-11-17 실제 운영 관측과 11-18 v3.1 B 파일 배치 상태는 아래와 같습니다. 디스크 여유, live `.env` 전체,
+기존 v1 모델의 호스트 절대 경로는 이번 검토에서 확인하지 않았습니다.
 기본 Compose 컨테이너 내부 v1 경로는 `/models/ptext-koelectra-v1-2epoch-20260929`이고,
 호스트 경로는 운영 측 `PTEXT_MODEL_HOST_PATH` 설정을 확인하고 그대로 유지해야 합니다.
 
 **배포 보류:** 전달된 v3.1 B `package_manifest.json`은 `PTEXT_V3_1_B_EXPERIMENTAL_NOT_APPROVED_FOR_PRODUCTION`으로 표시합니다.
 독립적인 사람 라벨 평가/모델 담당자의 운영 승인이 아직 필요합니다. 합성 로드·판정 동작 및 MySQL/SSE 테스트 결과는
-모델의 실제 정확도 또는 운영 전환 승인을 뜻하지 않습니다. 다음 절차는 문서화만 했습니다.
+모델의 실제 정확도 또는 운영 전환 승인을 뜻하지 않습니다. 운영 호스트에 모델 파일만 배치해도 v2가 활성화되지는 않습니다.
+
+## 모델 파일 배치 완료 — 2026-11-18 (사용자 확인)
+
+- VM: `review-ai-gcp-prod`
+- v3.1 B 호스트 디렉터리: `/opt/review-ai-models/ptext-koelectra-v3.1-b`
+- 가중치·`config.json`·`inference_config.json`·토크나이저 포함 7개 파일
+- 가중치 SHA-256: `012b65174cdbc2e1fb36d75519438043bebd4317a69ea9997325b66bb436474b`
+- 기존 v1 호스트 경로와 운영 컨테이너·DB는 변경되지 않았습니다. 이번 파일 배치에는 별도 v2 마운트 설정이 포함되지 않았습니다.
+
+이 상태는 사용자가 확인한 값으로 기록했습니다. 이 검토에서는 운영 VM에 접속하거나 파일 무결성·권한을 재확인하지 않았습니다.
+
+### PR 병합 안전 경계
+
+`main` 병합으로 실행되는 `AI CI`는 테스트와 러너 내부의 기본 Compose 검증·이미지 빌드만 수행합니다.
+`GCP AI Manual Deploy`는 `main`의 명시적 `workflow_dispatch` 전용입니다. 병합 자체는 운영 VM의 Git pull,
+컨테이너 재생성, DB 마이그레이션 또는 v2 활성화를 트리거하지 않습니다.
+
+기본 `docker-compose.yml`은 기존 v1 마운트·MySQL 볼륨·v1 Groq 설정을 유지하며 v2 플래그와 모델 경로를
+컨테이너에 전달하지 않습니다. `docker-compose.v2.yml`은 기본 파일명이나 자동 오버라이드가 아니며 명시적으로
+추가해야 합니다. 오버레이를 지정해도 `ENABLE_DATA_AI_V2`와 `ENABLE_V2_GROQ_SUMMARY`는 기본 0입니다.
+향후 수동 배포 전에 실제 `COMPOSE_FILE`·오버라이드와 v1 설정을 확인하고, 승인 전에는 v2 오버레이를 지정하지 않습니다.
 
 ## GCP 운영 관측 — 2026-11-17
 
@@ -42,14 +64,15 @@ DONE 77건은 관측 구간의 완료 건수이며, 96.5초는 DB 타임스탬�
 v3.1 B의 raw probability threshold는 0.5, score temperature는 2, max length는 256입니다.
 버전 메타데이터의 `ptext-koelectra-v3.1-b-seed20261115`는 위 manifest의 체크포인트를 뜻합니다.
 
-1. 운영팀과 체크포인트 출처를 확정합니다. 승인 이후에만 기존 IAP/OS Login 및 제한된 운영 권한을 사용하여
-   새 호스트 디렉터리(예시 `/opt/review-ai-models/ptext-koelectra-v3.1-b`)에 handoff의 `model/` 파일을 전송합니다.
-   임시 폴더에서 체크섬을 검증한 뒤 v2 전용 최종 경로로 옮깁니다. 기존 v1 경로를 수정하거나 덮지 않습니다.
-2. 서버에서 `sha256sum "$PTEXT_V31B_MODEL_HOST_PATH/model.safetensors"` 및 제공된 `SHA256SUMS.txt`에
-   포함된 파일의 무결성을 확인합니다. Docker 사용자(UID 10001)에게 읽기 권한만 허용합니다.
+1. 운영팀과 체크포인트 출처를 확정하고, 승인 후 이미 배치된 `/opt/review-ai-models/ptext-koelectra-v3.1-b`를
+   사용합니다. 향후 파일 교체가 필요할 때만 승인된 IAP/OS Login 경로로 임시 디렉터리에 전송·검증한 뒤 옮깁니다.
+   기존 v1 경로를 수정하거나 덮지 않습니다.
+2. 활성화 직전에 `sha256sum /opt/review-ai-models/ptext-koelectra-v3.1-b/model.safetensors` 및 제공된
+   `SHA256SUMS.txt`에 포함된 모델 7개 파일과 컨테이너 읽기 권한(UID 10001)을 확인합니다.
    디스크는 신규 가중치 약 431 MiB + 설정/임시 업로드 분 + 이미지 빌드 여유 + DB 성장/백업 여유를 따로 확인합니다.
 3. `docker-compose.v2.yml`을 명시할 때만 외부 v2 디렉터리를 읽기 전용으로 마운트합니다.
-   `PTEXT_V31B_MODEL_HOST_PATH`는 실제 존재하는 절대 디렉터리입니다. `ENABLE_DATA_AI_V2=1`은 migration 후 켜고,
+   승인된 배포에서 `PTEXT_V31B_MODEL_HOST_PATH=/opt/review-ai-models/ptext-koelectra-v3.1-b`를 지정합니다.
+   `ENABLE_DATA_AI_V2=1`은 migration 후 켜고,
    `ENABLE_V2_GROQ_SUMMARY=0`을 초기값으로 사용합니다. `V2_GROQ_MODEL=openai/gpt-oss-20b`, 기존 PRIMARY와
    `GROQ_TIMEOUT_SECONDS`를 사용하되 v1 활성화 플래그/설정은 그대로 둡니다. 운영 비밀값은 로그 또는 Git에 쓰지 않습니다.
 4. `docker compose -f docker-compose.yml -f docker-compose.v2.yml config --quiet`로 확인합니다. 호스트 경로가
