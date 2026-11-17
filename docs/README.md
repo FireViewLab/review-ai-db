@@ -7,6 +7,14 @@
 내용을 수정하지 않았으며, **분류 자체가 팀의 설계 채택·폐기 또는 운영 배포 완료를 뜻하지 않습니다.**
 문서 안의 “현재”, “완료”는 해당 문서 작성 당시의 표현일 수 있습니다.
 
+## 최신 v2 병행 운영 준비 (로컬, 미배포)
+
+- [Data AI v2 SSE 계약](data-ai-v2-integration.md)과 [Data 서버 인수인계](data-ai-v2-data-server-handoff.md)
+- [GCP v1/v2 병행 운영 준비 및 롤백](ai-v1-v2-gcp-deployment.md)
+- [v1/v2 실제 모델·격리 MySQL·Docker 검증](validation/ai-v1-v2-20261117.md)
+
+이 문서들은 `feat/ai-v3-candidate-integration`의 기본 OFF 기능을 설명합니다. 기존 v0.5 운영 계약을 대체하지 않습니다.
+
 ## 처음 읽는 순서
 
 1. [프로젝트 README](../README.md): 역할, 기능 상태, 설치와 첫 분석 요청.

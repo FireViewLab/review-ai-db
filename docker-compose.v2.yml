@@ -1,0 +1,15 @@
+# Opt-in only; the existing base Compose file and manual GCP workflow are unchanged.
+services:
+  ai:
+    environment:
+      ENABLE_DATA_AI_V2: ${ENABLE_DATA_AI_V2:-0}
+      PTEXT_V31B_MODEL_PATH: /models/ptext-koelectra-v3.1-b
+      ENABLE_V2_GROQ_SUMMARY: ${ENABLE_V2_GROQ_SUMMARY:-0}
+      V2_GROQ_MODEL: ${V2_GROQ_MODEL:-openai/gpt-oss-20b}
+    volumes:
+      - type: bind
+        source: ${PTEXT_V31B_MODEL_HOST_PATH:?Set an existing v3.1 B model directory before using this overlay}
+        target: /models/ptext-koelectra-v3.1-b
+        read_only: true
+        bind:
+          create_host_path: false
