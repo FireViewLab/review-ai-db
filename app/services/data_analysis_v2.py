@@ -1,13 +1,15 @@
-"""V2 orchestration: v3.1-only inference, deterministic policy, optional reasons, then commit."""
+"""V2 orchestration: v3.1-only inference, deterministic policy, optional reasons, then local replay cache."""
 
+import asyncio
 import logging
 from threading import RLock
 
+from starlette.concurrency import run_in_threadpool
+
 from app.analyzers.p_text import configured_batch_size, load_candidate_predictor
-from app.contracts.data_ai_v2 import DataAnalyzeResponseV2, REASON_VERSION_V2
+from app.contracts.data_ai_v2 import DataAnalyzeResponseV2, REASON_VERSION_V2, v2_versions
 from app.experimental.candidate_analysis import CandidateBatch, CandidateReview, _REASON_MESSAGES, analyze_policy_batch
 from app.experimental.policy_summary import compose_policy_summary
-from app.services.data_analysis_stream import saved_result
 
 LOGGER = logging.getLogger(__name__)
 _V2_INFERENCE_LOCK = RLock()
@@ -87,14 +89,67 @@ def evaluate_v2(payload, *, predict=None, groq=None) -> DataAnalyzeResponseV2:
                                  review_count=len(results), results=results)
 
 
-def evaluate_and_read_v2(store, job_id, payload, *, groq):
+def v2_result_rows(response, payload):
+    ids = [review.review_id for review in payload.reviews]
+    by_id = {review.review_id: review for review in response.results}
+    if (response.platform != payload.platform or response.product_id != payload.product_id
+            or set(ids) != set(by_id) or len(ids) != response.review_count):
+        raise ValueError("V2 result does not match request")
+    return [by_id[review_id].model_dump(mode="json") for review_id in ids]
+
+
+def evaluate_and_cache_v2(job, payload, *, groq):
     try:
         response = evaluate_v2(payload, groq=groq)
-        store.complete(job_id, response.model_dump(mode="json"), explanation_policy_version=REASON_VERSION_V2)
-        return saved_result(store, job_id, payload, result_type=DataAnalyzeResponseV2)
+        rows = v2_result_rows(response, payload)
     except Exception as exc:
         try:
-            store.fail(job_id, v2_error_code(exc))
+            job.fail(v2_error_code(exc))
         except Exception:
-            pass
+            LOGGER.warning("V2 failure snapshot could not be recorded")
         raise
+    # If durable commit fails, do not replace a possibly committed DONE snapshot with FAILED.
+    job.complete(response.model_dump(mode="json"), explanation_policy_version=REASON_VERSION_V2)
+    return rows
+
+
+async def start_v2(tasks, store, key, payload, *, groq):
+    """Register the work before awaiting admission; an HTTP disconnect never owns the lease."""
+    loop = asyncio.get_running_loop()
+    admitted = loop.create_future()
+
+    def run():
+        try:
+            with store.claim(key, payload.model_dump(mode="json"), v2_versions()) as job:
+                if not job.claim.is_new:
+                    rows = v2_result_rows(DataAnalyzeResponseV2.model_validate(job.result), payload)
+                    loop.call_soon_threadsafe(admitted.set_result, (job.claim, rows))
+                    return
+                loop.call_soon_threadsafe(admitted.set_result, (job.claim, None))
+                return evaluate_and_cache_v2(job, payload, groq=groq)
+        except Exception as exc:
+            # The event loop observes these callbacks in order: before admission it
+            # returns an HTTP error, after admission the task produces an SSE error.
+            def reject(error):
+                if not admitted.done():
+                    admitted.set_exception(error)
+
+            loop.call_soon_threadsafe(reject, exc)
+            raise
+
+    task = asyncio.create_task(run_in_threadpool(run))
+    tasks.add(task)
+
+    def finished(completed):
+        tasks.discard(completed)
+        if completed.cancelled():
+            admitted.cancel()
+        else:
+            error = completed.exception()
+            if error is not None and not admitted.done():
+                admitted.set_exception(error)
+
+    task.add_done_callback(finished)
+    admitted.add_done_callback(lambda future: future.exception() if not future.cancelled() else None)
+    claim, replay = await asyncio.shield(admitted)
+    return claim, replay, task if claim.is_new else None

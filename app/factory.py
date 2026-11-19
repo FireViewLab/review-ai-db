@@ -30,10 +30,10 @@ def create_app(*, job_store=None, v2_job_store=None, v2_groq=None) -> FastAPI:
         app.state.analysis_tasks = set()
         if v2:
             from app.integrations.groq_v2_summary import V2GroqSummary
+            from app.repositories.v2_file_jobs import FileV2JobStore
 
-            # Explicit migration creates the additive v2 tables. Missing v2 tables
-            # fail v2 claims, not v1 startup or /health.
-            app.state.v2_job_store = v2_job_store if v2_job_store is not None else MySQLJobStore.from_env(scope="v2")
+            # Optional local mode; production's opt-in v2 sidecar never starts this v1 factory.
+            app.state.v2_job_store = v2_job_store if v2_job_store is not None else FileV2JobStore.from_env()
             app.state.v2_groq = v2_groq if v2_groq is not None else V2GroqSummary.from_env()
         crawler = None
         if experimental:

@@ -10,7 +10,7 @@
 호스트 경로는 운영 측 `PTEXT_MODEL_HOST_PATH` 설정을 확인하고 그대로 유지해야 합니다.
 
 **배포 보류:** 전달된 v3.1 B `package_manifest.json`은 `PTEXT_V3_1_B_EXPERIMENTAL_NOT_APPROVED_FOR_PRODUCTION`으로 표시합니다.
-독립적인 사람 라벨 평가/모델 담당자의 운영 승인이 아직 필요합니다. 합성 로드·판정 동작 및 MySQL/SSE 테스트 결과는
+독립적인 사람 라벨 평가/모델 담당자의 운영 승인이 아직 필요합니다. 로컬 합성 추론·SSE 테스트 결과는
 모델의 실제 정확도 또는 운영 전환 승인을 뜻하지 않습니다. 운영 호스트에 모델 파일만 배치해도 v2가 활성화되지는 않습니다.
 
 ## 모델 파일 배치 완료 — 2026-11-18 (사용자 확인)
@@ -19,7 +19,7 @@
 - v3.1 B 호스트 디렉터리: `/opt/review-ai-models/ptext-koelectra-v3.1-b`
 - 가중치·`config.json`·`inference_config.json`·토크나이저 포함 7개 파일
 - 가중치 SHA-256: `012b65174cdbc2e1fb36d75519438043bebd4317a69ea9997325b66bb436474b`
-- 기존 v1 호스트 경로와 운영 컨테이너·DB는 변경되지 않았습니다. 이번 파일 배치에는 별도 v2 마운트 설정이 포함되지 않았습니다.
+- 기존 v1 호스트 경로와 운영 컨테이너·DB는 변경되지 않았습니다. 이번 파일 배치는 v2 활성화를 의미하지 않습니다.
 
 이 상태는 사용자가 확인한 값으로 기록했습니다. 이 검토에서는 운영 VM에 접속하거나 파일 무결성·권한을 재확인하지 않았습니다.
 
@@ -29,10 +29,9 @@
 `GCP AI Manual Deploy`는 `main`의 명시적 `workflow_dispatch` 전용입니다. 병합 자체는 운영 VM의 Git pull,
 컨테이너 재생성, DB 마이그레이션 또는 v2 활성화를 트리거하지 않습니다.
 
-기본 `docker-compose.yml`은 기존 v1 마운트·MySQL 볼륨·v1 Groq 설정을 유지하며 v2 플래그와 모델 경로를
-컨테이너에 전달하지 않습니다. `docker-compose.v2.yml`은 기본 파일명이나 자동 오버라이드가 아니며 명시적으로
-추가해야 합니다. 오버레이를 지정해도 `ENABLE_DATA_AI_V2`와 `ENABLE_V2_GROQ_SUMMARY`는 기본 0입니다.
-향후 수동 배포 전에 실제 `COMPOSE_FILE`·오버라이드와 v1 설정을 확인하고, 승인 전에는 v2 오버레이를 지정하지 않습니다.
+기본 `docker-compose.yml`은 기존 v1 마운트·MySQL 볼륨·v1 Groq 설정을 유지합니다.
+v2는 명시적으로 `docker-compose.v2.yml`과 `--profile v2`를 사용하는 **별도 프로젝트**입니다.
+두 Compose 파일을 함께 지정하지 마세요. 기존 GCP workflow는 v2를 시작·중지·업데이트하지 않습니다.
 
 ## GCP 운영 관측 — 2026-11-17
 
@@ -58,82 +57,58 @@ DONE 77건은 관측 구간의 완료 건수이며, 96.5초는 DB 타임스탬�
 | 체크포인트 | `ptext-koelectra-v1-2epoch-20260929` 인수인계 폴더 | `ptext-v3.1-b-experimental-seed20261115-share-20261116/model` |
 | 검증된 가중치 바이트 | 451,715,672 | 451,715,672 |
 | `model.safetensors` SHA-256 | `e7677366e93afef3f26890c81fffa62e7a1db96f24cba55a19cdeaf9efb5f354` | `012b65174cdbc2e1fb36d75519438043bebd4317a69ea9997325b66bb436474b` |
-| 컨테이너 경로 | 기존 `PTEXT_MODEL_PATH` 그대로 | `/models/ptext-koelectra-v3.1-b` (오버레이), `PTEXT_V31B_MODEL_PATH` |
+| 컨테이너 경로 | 기존 `PTEXT_MODEL_PATH` 그대로 | `/models/ptext-koelectra-v3.1-b` (전용 서비스), `PTEXT_V31B_MODEL_PATH` |
 
 각 폴더에는 `config.json`, `inference_config.json`, 가중치와 tokenizer/config/vocab/special tokens가 필요합니다.
 v3.1 B의 raw probability threshold는 0.5, score temperature는 2, max length는 256입니다.
 버전 메타데이터의 `ptext-koelectra-v3.1-b-seed20261115`는 위 manifest의 체크포인트를 뜻합니다.
 
-1. 운영팀과 체크포인트 출처를 확정하고, 승인 후 이미 배치된 `/opt/review-ai-models/ptext-koelectra-v3.1-b`를
-   사용합니다. 향후 파일 교체가 필요할 때만 승인된 IAP/OS Login 경로로 임시 디렉터리에 전송·검증한 뒤 옮깁니다.
-   기존 v1 경로를 수정하거나 덮지 않습니다.
-2. 활성화 직전에 `sha256sum /opt/review-ai-models/ptext-koelectra-v3.1-b/model.safetensors` 및 제공된
-   `SHA256SUMS.txt`에 포함된 모델 7개 파일과 컨테이너 읽기 권한(UID 10001)을 확인합니다.
-   디스크는 신규 가중치 약 431 MiB + 설정/임시 업로드 분 + 이미지 빌드 여유 + DB 성장/백업 여유를 따로 확인합니다.
-3. `docker-compose.v2.yml`을 명시할 때만 외부 v2 디렉터리를 읽기 전용으로 마운트합니다.
-   승인된 배포에서 `PTEXT_V31B_MODEL_HOST_PATH=/opt/review-ai-models/ptext-koelectra-v3.1-b`를 지정합니다.
-   `ENABLE_DATA_AI_V2=1`은 migration 후 켜고,
-   `ENABLE_V2_GROQ_SUMMARY=0`을 초기값으로 사용합니다. `V2_GROQ_MODEL=openai/gpt-oss-20b`, 기존 PRIMARY와
-   `GROQ_TIMEOUT_SECONDS`를 사용하되 v1 활성화 플래그/설정은 그대로 둡니다. 운영 비밀값은 로그 또는 Git에 쓰지 않습니다.
-4. `docker compose -f docker-compose.yml -f docker-compose.v2.yml config --quiet`로 확인합니다. 호스트 경로가
-   없으면 Docker가 마운트에 실패할 수 있으므로 기동 **전** 확인합니다. 디렉터리는 기동됐으나 체크포인트가 손상된 경우
-   모델은 지연 로딩이므로 v2 작업만 `V2_MODEL_UNAVAILABLE`이 되고 v1과 `/health`는 그 실패에 의존하지 않습니다.
+## 승인 후에만 실행할 병행 배포 절차
 
-## MySQL: 추가 전용 마이그레이션
-
-기존 `ai_analysis_jobs`와 `ai_analysis_idempotency`는 그대로입니다. 기존 테이블의 버전 JSON을 확장하는 선택지는
-운영 DDL 및 기존 조회/멱등성 키 호환 위험이 있어 쓰지 않았습니다. `ai_analysis_v2_jobs`(입력/결과 JSON,
-상태/설명 버전)와 `ai_analysis_v2_idempotency`(유일 키 해시, payload 해시, 작업 FK, 버전 JSON)를 별도로 만듭니다.
-Data 서버 DB 변경과는 독립입니다. 기존 `DONE` 행 백필이나 점수 재계산은 없습니다.
-
-1. 실제 `DB_NAME`·연결 대상을 확인하고, 운영 승인 하에 사내 비밀 관리 방식으로 기존 스키마와 결과를 백업합니다.
-   예: `mysqldump --single-transaction --no-tablespaces --databases <db>`의 결과를 접근 제한된 백업 저장소에 보관.
-   인증값은 명령줄이나 문서에 넣지 않습니다. InnoDB 스냅샷과 복원 절차를 별도 환경에서 검증합니다.
-2. 아래 쿼리로 v1 행 수/상태와 기존 DONE 작업을 기준점에 기록합니다. 운영은 신규 요청이 동시에 들어오므로 단순 행 수
-   비교에 더해 샘플 기존 UUID의 버전과 replay 결과를 비교합니다.
-
-   ```sql
-   SELECT status, COUNT(*) FROM ai_analysis_jobs GROUP BY status;
-   SELECT COUNT(*) FROM ai_analysis_idempotency;
-   SHOW TABLES LIKE 'ai_analysis_v2%';
-   ```
-
-3. 승인 후에만, **staged** 이미지에서 기존 DB 네트워크/환경변수를 물려받아 다음을 실행합니다.
+1. 운영팀과 v3.1 B 체크포인트 출처·승인을 확인합니다. 이미 배치된 `/opt/review-ai-models/ptext-koelectra-v3.1-b`의
+   SHA-256과 UID 10001 읽기 권한을 확인합니다. v1 모델 경로는 수정하지 마세요. 리소스·보존 정책 예산(이미지 및 파일 볼륨)을 확인합니다.
+2. v1의 Compose 프로젝트/환경은 그대로 두고, v2용 **별도 비공개** 환경 파일(예: `.env.v2`)에
+   `V2_INTERNAL_TOKEN`을 필수 설정합니다. 기본 모델 경로를 변경할 때만 `PTEXT_V31B_MODEL_HOST_PATH`를 변경합니다.
+   `ENABLE_V2_GROQ_SUMMARY=0`에서 시작하세요. Groq가 따로 승인되면 `V2_GROQ_API_KEY_PRIMARY`를 설정합니다.
+   v1의 DB/토큰/추론 설정을 복사할 필요는 없습니다.
+3. 아래는 **운영 승인 이후에만** 사용할 명령입니다. 기본 Compose와 함께 `-f`로 합치지 말고
+   v1 프로젝트 이름도 재사용하지 마세요. `-p review-ai-v2`는 셸의 `COMPOSE_PROJECT_NAME`이 v2의
+   프로젝트 이름을 덮어쓰지 않도록 고정합니다. 이 구성은 v1의 MySQL 서비스·네트워크·볼륨을 공유하지 않습니다.
 
    ```bash
-   docker compose -f docker-compose.yml -f docker-compose.v2.yml run --rm --no-deps ai python -m app.repositories.v2_job_migration --apply
-   docker compose -f docker-compose.yml -f docker-compose.v2.yml run --rm --no-deps ai python -m app.repositories.v2_job_migration --check
+   docker compose -p review-ai-v2 --env-file .env.v2 -f docker-compose.v2.yml --profile v2 config --quiet
+   docker compose -p review-ai-v2 --env-file .env.v2 -f docker-compose.v2.yml --profile v2 up -d --build ai-v2
+   curl --fail --retry 12 --retry-all-errors http://127.0.0.1:8001/health
    ```
 
-   v2 DDL만 실행되고 기존 DB advisory lock을 사용합니다. 두 테이블 CREATE는 재실행 가능합니다.
-   일부 DDL만 성공한 경우 권한/기존 테이블 구조를 확인하고 재실행하세요. 운영 데이터나 테이블을 삭제하지 않습니다.
-4. v1 쿼리와 기존 DONE replay를 반복하고, `SHOW CREATE TABLE ai_analysis_v2_jobs` 및
-   `SHOW CREATE TABLE ai_analysis_v2_idempotency`로 키/외래 키/컬럼을 검사합니다. 격리 테스트와 동일하게 같은 키의
-   v1/v2 결과를 각각 저장하고, v2 결과 재조회 및 동일 payload replay가 기존 반영 데이터에 영향을 주지 않는지 검사합니다.
+4. v2는 호스트 `127.0.0.1:${V2_HOST_PORT:-8001}`에만 게시합니다. Data 서버가 접속하는 승인된 프록시/내부 경로에서
+   **`POST /api/v2/data/analyze/stream`만 v2 포트로** 별도 라우팅하세요. v1 경로를 바꾸지 않습니다.
+   프록시가 컨테이너인 경우 호스트 루프백 접근 방식을 별도로 검토하고, 포트를 공인 인터페이스에 열지 마세요.
+   SSE 버퍼링·응답 읽기 타임아웃을 검증하고 Data 팀과 인증/계약/적재를 시험합니다.
+5. `/health`는 HTTP 기동 확인입니다. v3.1 B 모델은 지연 로딩이므로 승인된 합성 리뷰로 `meta` 버전,
+   유효 점수, `done`, 재전송을 별도 검사합니다. v1의 기존 JSON/SSE도 확인하고, 500건·동시 트래픽·응답 지연,
+   CPU·RAM·MySQL 여유를 스테이징에서 먼저 측정하세요. v2 기본은 Worker 1 / OMP 1 / CPU 상한 1 / RAM 상한 2 GiB입니다.
+   제한은 v1 용량을 보장하지 않습니다. 같은 VM에서 Worker를 늘리면 모델 적재와 자원 경합도 늘 수 있습니다.
 
-## 배포 순서 및 롤백
+## 파일 저장 및 복구
 
-1. [로컬·격리 검증](validation/ai-v1-v2-20261117.md) 후 Data 팀과 스테이징 계약·수집을 검증합니다.
-   운영 승인 후 체크포인트와 VM 여유·마이그레이션을 확인하고, v1 트래픽을 유지한 상태에서만 v2를 기동합니다.
-   아래 예시는 승인 후에만 실행합니다.
+- v2는 `v2-job-data` named volume 아래 `/service/data/v2-jobs`에서 상태를 관리합니다. 키와 입력의 해시, UUID,
+  상태/버전, DONE 재전송용 결과만 기록합니다. 요청 본문·공유 토큰·평문 멱등 키를 저장하지 않습니다.
+  결과의 리뷰 식별자와 설명은 민감할 수 있으므로 접근과 백업을 제한하세요.
+- 파일 fsync → 원자적 rename → 디렉터리 fsync 후에만 새 SSE 결과를 전송합니다. 커밋 실패 시 `result`/`done`은 보내지 않습니다.
+  작업별 파일 잠금을 사용하며, 동일 Linux 로컬 볼륨을 공유하는 **한 호스트 내**의 여러 Uvicorn Worker만 지원합니다.
+  다른 VM/복제 서비스, NFS/SMB, 볼륨 유실, 호스트 저장장치 장애까지 멱등성을 보장하지 않습니다.
+- 완료 상태는 **같은 프로젝트와 볼륨**을 유지하면 컨테이너 재생성 후에도 동일 결과로 재생합니다. 프로세스 종료로
+  RUNNING 잠금이 사라진 작업은 클라이언트가 같은 키·입력·모델/정책 버전으로 재요청할 때 같은 UUID로 재계산합니다.
+  분석의 exactly-once나 Data DB 적재 완료를 보장하지 않습니다.
+- AI MySQL v2 테이블 또는 마이그레이션은 필요하지 않습니다. 이전 시험 배포에서 테이블이 존재해도 이번 변경은
+  조회·이관·삭제하지 않습니다. 기존 DB의 멱등 키·완료 결과는 파일 볼륨으로 자동 이전되지 않습니다. 필요한 경우 트래픽
+  전환 전 기존 작업을 끝까지 처리하고 Data DB 적재를 확인한 뒤 새 작업을 보내세요.
+- 캐시는 자동 만료되지 않습니다. 디스크 사용량을 감시하고 재전송 보존 기간을 Data 팀과 합의하세요.
+  실행 중에는 잠금 파일을 포함한 작업 파일을 삭제하지 마세요. `down -v`, 볼륨 초기화는 사용하지 않습니다.
 
-   ```bash
-   docker compose -f docker-compose.yml -f docker-compose.v2.yml up -d --build ai
-   curl --fail --retry 12 --retry-all-errors http://127.0.0.1:8000/health
-   ```
+## 롤백
 
-   현재 GCP workflow는 기본 Compose만 실행합니다. v2가 켜진 뒤에 기존 deploy workflow를 그대로 실행하면
-   오버레이 없이 재생성돼 v2가 꺼질 수 있습니다. 차후 일관된 운용 경로를 승인하기 전에는 배포를 섞지 않습니다.
-2. `/health`, v1 JSON/SSE, v2 SSE 순서로 확인합니다. v2는 합성 리뷰로 인증·`meta` 버전·`result`·`done` 및
-   replay를 확인합니다. `/health`가 정상이라고 v2 체크포인트/테이블까지 정상이라는 뜻은 아닙니다.
-3. 권장 첫 시험은 v2 Groq OFF입니다. Groq ON은 별도 품질/운영 승인 후에만 적용합니다. 초기에는 v1/v2 실패율,
-   응답 시간, RSS/컨테이너 RAM·CPU, DB 지연, Groq 429·반복 복귀율을 보세요. 프로세스별 Groq 제한은 공유 쿼터 제어가
-   아니므로 다중 worker·v1 Groq 트래픽을 합산합니다.
-4. 오류 증가 시 Data 트래픽을 v1로 되돌리고 v2/Groq 플래그를 끕니다. 필요하면 정상으로 검증된 v1 이미지 및 기본
-   Compose로 복귀합니다. **v2 모델 파일과 두 새 테이블은 남겨 둡니다.** `down -v`·볼륨 삭제·기존 데이터 롤백은 하지 않습니다.
-
-같은 컨테이너는 기존 인증/DB/캐시 구조를 재사용하기 쉽지만 worker마다 모델 두 개까지 적재될 수 있습니다.
-별도 컨테이너·프록시 라우팅은 운영 변경이 더 크지만 리소스 제한을 별도로 설정하고 v1을 독립 롤백하기 쉽습니다.
-동일 2 vCPU VM에서 컨테이너만 분리한다고 CPU 용량이 늘어나지는 않습니다. 로컬 2 vCPU/4 GiB 실험과
-운영 VM 2 vCPU/약 8 GiB 관측은 별개입니다. 운영 관측에서 이미 CPU 여유가 작았으므로 500건·동시 부하 검증 전에는
-모델 2개·worker 2개 동작을 운영 기본으로 켜지 않습니다. MySQL·OS에 필요한 여유도 따로 확인합니다.
+v2 라우팅/신규 데이터 작업부터 중지하고, 이미 열린 스트림을 정상 종료시킨 후 `docker compose -p review-ai-v2 --env-file .env.v2 -f docker-compose.v2.yml --profile v2 stop ai-v2`를 사용합니다.
+v1의 Compose, MySQL, 기존 트래픽은 그대로 두고 v2 모델과 재전송 볼륨을 보존합니다. v2 결과를 같은 상품의 v1 RTI로 바꾸지 않습니다.
+현재 검증은 로컬이며 GCP·라우팅·Data DB 적재는 실제 변경하지 않았습니다.

@@ -1,15 +1,39 @@
-# Opt-in only; the existing base Compose file and manual GCP workflow are unchanged.
+# Standalone opt-in project. Do not combine with docker-compose.yml.
+name: review-ai-v2
 services:
-  ai:
+  ai-v2:
+    profiles: [v2]
+    image: review-ai-v2:file-jobs
+    build: .
+    command: ["uvicorn", "app.v2_server:app", "--host", "0.0.0.0", "--port", "8000", "--timeout-graceful-shutdown", "150", "--no-access-log"]
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 180s
+    cpus: "${V2_CPUS:-1.0}"
+    mem_limit: "${V2_MEMORY_LIMIT:-2g}"
+    ports:
+      - "127.0.0.1:${V2_HOST_PORT:-8001}:8000"
     environment:
-      ENABLE_DATA_AI_V2: ${ENABLE_DATA_AI_V2:-0}
+      REQUIRE_INTERNAL_TOKEN: "1"
+      INTERNAL_TOKEN: ${V2_INTERNAL_TOKEN:-}
+      UVICORN_WORKERS: ${V2_UVICORN_WORKERS:-1}
+      OMP_NUM_THREADS: ${V2_OMP_NUM_THREADS:-1}
+      MKL_NUM_THREADS: ${V2_OMP_NUM_THREADS:-1}
+      PTEXT_BATCH_SIZE: ${V2_PTEXT_BATCH_SIZE:-8}
       PTEXT_V31B_MODEL_PATH: /models/ptext-koelectra-v3.1-b
+      CUDA_VISIBLE_DEVICES: ""
+      V2_JOB_DIR: /service/data/v2-jobs
       ENABLE_V2_GROQ_SUMMARY: ${ENABLE_V2_GROQ_SUMMARY:-0}
       V2_GROQ_MODEL: ${V2_GROQ_MODEL:-openai/gpt-oss-20b}
+      GROQ_API_KEY_PRIMARY: ${V2_GROQ_API_KEY_PRIMARY:-}
+      GROQ_TIMEOUT_SECONDS: ${V2_GROQ_TIMEOUT_SECONDS:-5}
     volumes:
       - type: bind
-        source: ${PTEXT_V31B_MODEL_HOST_PATH:?Set an existing v3.1 B model directory before using this overlay}
+        source: ${PTEXT_V31B_MODEL_HOST_PATH:-/opt/review-ai-models/ptext-koelectra-v3.1-b}
         target: /models/ptext-koelectra-v3.1-b
         read_only: true
         bind:
           create_host_path: false
+      - v2-job-data:/service/data
+volumes:
+  v2-job-data:

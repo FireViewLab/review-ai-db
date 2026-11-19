@@ -1,6 +1,7 @@
 # Data ↔ AI v2 SSE 연동 계약 (로컬 검증, 미배포)
 
-신규 경로는 `POST /api/v2/data/analyze/stream` 하나입니다. `ENABLE_DATA_AI_V2=1`일 때만 등록합니다.
+신규 경로는 `POST /api/v2/data/analyze/stream` 하나입니다. 독립 v2 서비스에 등록되며 기본 v1 배포에서는 열리지 않습니다.
+로컬에서 v1과 같은 앱에 연결하는 모드는 `ENABLE_DATA_AI_V2=1`을 사용합니다.
 기존 `POST /api/v1/data/analyze`와 `POST /api/v1/data/analyze/stream`, v0.5 응답/RTI, 인증 및 replay는 유지합니다.
 Data는 기존 트래픽을 v1에 둔 상태에서 테스트 환경에서만 v2를 연결하세요.
 
@@ -16,7 +17,7 @@ Data는 기존 트래픽을 v1에 둔 상태에서 테스트 환경에서만 v2�
 | `review_id`, `content` | 문자열 | 필수, 공백만 입력 불가. 숫자로 변환하거나 trim하지 않음 |
 | `rating` | 숫자 또는 `null` | 선택, 0~5. 검증된 5점 척도 값만 보내고 결측·추정값은 `null`/누락 |
 | `image_count` | 정수 또는 `null` | 선택, 0 이상. 0은 확인된 0장, 1 이상은 확인된 개수, `null`/누락은 미확인 |
-| `written_at` | 문자열 또는 `null` | 선택. 원문 저장은 하지만 날짜 단독으로 Behavior 근거를 만들지 않음 |
+| `written_at` | 문자열 또는 `null` | 선택. 입력 검증·해시에 포함되지만 날짜 단독으로 Behavior 근거를 만들지 않음 |
 
 알 수 없는 필드, 숫자 문자열/불리언 등 잘못된 타입, 범위 초과 및 빈 배치는 422입니다.
 별점이나 사진의 검증 여부를 나타내는 별도 wire 필드는 없습니다. **Data가 확인한 값만 non-null로 보낸다**는 전제입니다.
@@ -49,8 +50,8 @@ data: {"request_id":"data-1","ai_job_id":"job-1","result_count":1}
 ```
 
 `progress`는 분석 시작만 뜻합니다. 대기 중 heartbeat는 약 15초 간격이고, 빠른 작업에는 나오지 않을 수 있습니다.
-DB 커밋 후 요청 순서대로 `result`가 나옵니다. `done`과 결과 건수를 확인해야 성공입니다.
-연결이 끊겨도 AI 작업은 진행됩니다. DONE replay는 저장한 결과로 `meta → result* → done`을 반환하며 분석·Groq 재호출은 없습니다.
+AI 로컬 파일 커밋 후 요청 순서대로 `result`가 나옵니다. `done`과 결과 건수를 확인한 뒤 Data 서버가 자체 DB에 적재합니다.
+연결이 끊겨도 실행 중인 AI 프로세스는 작업을 계속합니다. DONE replay는 저장한 결과로 `meta → result* → done`을 반환하며 분석·Groq 재호출은 없습니다.
 
 ## 결과와 오류
 
@@ -58,8 +59,8 @@ DB 커밋 후 요청 순서대로 `result`가 나옵니다. `done`과 결과 건
 - `text_score`: v3.1 B. Behavior/Network는 기존 분석기 의미 유지; v2 입력에는 안정적인 작성자 ID와 이력이 없어 날짜만으로 Behavior를 산출하지 않습니다.
 - 세부 점수 `-1`은 unavailable입니다. 모든 분석 신호가 `-1`이면 `policy_index_v3=-1`, `evidence_level_v3=null`, `evidence_reasons_v3=[]`입니다. 모델 초기화·실행 예외는 숫자 대신 아래 SSE 오류로 구분합니다.
 - `rules_reasons_ko`와 `evidence_reasons_v3`는 계산된 목록 전체입니다. 화면은 `analysis_summary_ko`가 있으면 한 문단, 없으면 `rules_reasons_ko`를 표시합니다. `reason_source`는 `groq`, `python`, `rules`입니다. Groq 실패는 작업 실패가 아닙니다.
-- 토큰 불일치/누락은 v1과 같은 HTTP 401입니다. `REQUIRE_INTERNAL_TOKEN=1`인데 서버 토큰이 없으면 앱 시작이 실패합니다. 요청 검증 422, 스토리지 불가 503입니다.
-- HTTP 409 `detail.code`: `IDEMPOTENCY_IN_PROGRESS`는 같은 키로 기다렸다 재요청, `IDEMPOTENCY_KEY_REUSED`는 페이로드가 다름, `IDEMPOTENCY_FAILED`는 저장된 실패 상태입니다. 실패 원인 조치 후 **새 논리 작업**만 새 키를 사용합니다.
+- 토큰 불일치/누락은 v1과 같은 HTTP 401입니다. 독립 v2 서버는 토큰이 없으면 시작을 거부합니다. 요청 검증 422, 스토리지 불가 503입니다.
+- HTTP 409 `detail.code`: `IDEMPOTENCY_IN_PROGRESS`는 같은 키·페이로드로 기다렸다 재요청, `IDEMPOTENCY_KEY_REUSED`는 페이로드가 다름, `IDEMPOTENCY_FAILED`는 저장된 실패 또는 중단 후 버전 불일치입니다. 실패 원인 조치 후 **새 논리 작업**만 새 키를 사용합니다.
 - 스트림이 열린 뒤에는 아래 오류로 끝나며 `result`/`done`을 보내지 않습니다. 코드: `V2_MODEL_UNAVAILABLE`, `V2_INFERENCE_FAILED`, `ANALYSIS_FAILED`. 내부 예외나 키는 보내지 않습니다.
 
 ```text
@@ -67,4 +68,4 @@ event: error
 data: {"request_id":"data-1","ai_job_id":"job-1","code":"V2_MODEL_UNAVAILABLE","message":"분석 결과를 제공하지 못했습니다. 작업 상태 확인이 필요합니다.","retryable":false}
 ```
 
-v1/v2는 같은 멱등 키라도 독립 작업입니다. Data DB에서도 `(계약 버전, 작업/리뷰 식별자)`를 분리하고 `contract_version`, `model_version`, `policy_version`을 함께 보존하세요. v2 결과로 기존 RTI를 덮지 않습니다. 운영 전환은 양측 스테이징의 인증·처리량·SSE smoke test와 결과 보존 승인 이후로 남겨 둡니다.
+v1/v2는 같은 멱등 키라도 독립 작업입니다. Data DB에서도 `(계약 버전, 작업/리뷰 식별자)`를 분리하고 `contract_version`, `model_version`, `policy_version`을 함께 보존하세요. v2 결과로 기존 RTI를 덮지 않습니다. 재시도 구현은 [Data 팀 인수인계](data-ai-v2-data-server-handoff.md)를 참고하세요. 운영 전환은 양측 스테이징의 인증·처리량·SSE smoke test와 결과 보존 승인 이후로 남겨 둡니다.

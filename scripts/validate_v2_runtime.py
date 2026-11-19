@@ -1,4 +1,4 @@
-"""Pinned synthetic v2 verification: real CPU models, isolated MySQL SSE, or one live Groq batch."""
+"""Pinned synthetic v2 verification: real CPU models, standalone file-backed SSE, or one live Groq batch."""
 
 import argparse
 from concurrent.futures import ThreadPoolExecutor
@@ -6,9 +6,8 @@ from dataclasses import asdict
 import json
 import os
 from pathlib import Path
-import subprocess
 import sys
-from threading import Event, Thread
+from tempfile import TemporaryDirectory
 from time import perf_counter, process_time, sleep, time
 from uuid import uuid4
 
@@ -58,67 +57,23 @@ def model_profile(mode, payload):
 
 def streams(payload):
     from fastapi.testclient import TestClient
-    from app.factory import create_app
-    from app.repositories.mysql_jobs import MySQLJobStore
-    from app.repositories.v2_job_migration import migrate_v2_schema
+    from app.v2_server import create_v2_app
 
-    if (os.getenv("DB_HOST"), os.getenv("DB_PORT"), os.getenv("DB_NAME")) != ("127.0.0.1", "43317", "review_ai_v2_isolated"):
-        raise ValueError("Use only the named local disposable MySQL profile")
-    v1, v2 = MySQLJobStore.from_env(), MySQLJobStore.from_env(scope="v2")
-    v1.initialize()
-    migrate_v2_schema(v2)
-    commit_seconds = {"v1": [], "v2": []}
-
-    def measure_commit(store, version):
-        original = store.complete
-
-        def measured(*args, **kwargs):
-            started = perf_counter()
-            result = original(*args, **kwargs)
-            commit_seconds[version].append(perf_counter() - started)
-            return result
-
-        store.complete = measured
-
-    measure_commit(v1, "v1")
-    measure_commit(v2, "v2")
-    old_payload = {**payload, "reviews": [{k: v for k, v in row.items() if k != "image_count"} for row in payload["reviews"]]}
-    paths = {"v1": "/api/v1/data/analyze/stream", "v2": "/api/v2/data/analyze/stream"}
-    runs = []
-    base = peak_working_set_mib()
-    with TestClient(create_app(job_store=v1, v2_job_store=v2, v2_groq=V2GroqSummary())) as client:
-        def run(version, key):
-            start = perf_counter()
-            response = client.post(paths[version], headers={"X-Request-ID": "local-fixture", "Idempotency-Key": key},
-                                   json=old_payload if version == "v1" else payload)
-            assert response.status_code == 200 and "event: done" in response.text and "event: error" not in response.text
-            job_id = response.headers["X-Analysis-Job-ID"]
-            store, other = (v1, v2) if version == "v1" else (v2, v1)
-            stored = store.get(job_id)
-            assert stored["status"] == "DONE" and other.get(job_id) is None
-            results = [json.loads(text) for text in response.text.splitlines() if text.startswith("data: ")
-                       and '"text_score":' in text for text in (text[6:],)]
-            assert [{k: v for k, v in row.items() if k != "request_id"} for row in results] == stored["result"]["results"]
-            assert all(row["text_score"] >= 0 for row in results)
-            return {"version": version, "job_id": job_id, "wall_seconds": perf_counter() - start,
-                    "scores": [row["text_score"] for row in results], "peak_mib": peak_working_set_mib()}
-
-        for order in (("v1", "v2"), ("v2", "v1")):
-            key = uuid4().hex
-            runs.append([run(version, key) for version in order])
+    with TemporaryDirectory(prefix="v2-files-", dir=LOCAL_OUTPUT) as directory:
+        os.environ.update(V2_JOB_DIR=directory, INTERNAL_TOKEN="local-synthetic-only",
+                          ENABLE_V2_GROQ_SUMMARY="0")
+        expected = evaluate_v2(DataAnalyzeRequestV2.model_validate(payload)).model_dump(mode="json")
         key = uuid4().hex
-        mark, cpu = perf_counter(), process_time()
-        with ThreadPoolExecutor(max_workers=2) as pool:
-            concurrent = list(pool.map(lambda version: run(version, key), ("v1", "v2")))
-        parallel_wall, parallel_cpu = perf_counter() - mark, process_time() - cpu
-        replay = [run(version, key) for version in ("v1", "v2")]
-        for new, original in zip(replay, concurrent, strict=True):
-            assert new["job_id"] == original["job_id"] and new["scores"] == original["scores"]
-        assert concurrent[0]["scores"] != concurrent[1]["scores"]
-        assert client.get("/health").status_code == 200
-    return {"runs": runs, "parallel": concurrent, "replay": replay, "parallel_wall_seconds": parallel_wall,
-            "parallel_cpu_seconds": parallel_cpu, "peak_before_mib": base, "peak_mib": peak_working_set_mib(),
-            "mysql_complete_seconds": commit_seconds}
+        headers = {"X-Request-ID": "local-fixture", "Idempotency-Key": key,
+                   "X-Internal-Token": os.environ["INTERNAL_TOKEN"]}
+        with TestClient(create_v2_app()) as client:
+            fresh = read_stream(client.post(V2_PATH, headers=headers, json=payload), payload)
+            assert fresh["results"] == expected["results"]
+        with TestClient(create_v2_app()) as client:
+            replay = read_stream(client.post(V2_PATH, headers=headers, json=payload), payload, replay=True)
+            assert replay == fresh
+        return {"request_rows": len(payload["reviews"]), "weights_sha256": sha256(
+                Path(os.environ["PTEXT_V31B_MODEL_PATH"]) / "model.safetensors"), **fresh}
 
 
 def live_groq(payload):
@@ -146,11 +101,48 @@ def live_groq(payload):
             "total_wall_seconds": perf_counter() - mark, "results": result.model_dump(mode="json")["results"]}
 
 
-def container_smoke(payload, workers):
+V2_PATH = "/api/v2/data/analyze/stream"
+
+
+def frame_data(response):
+    return [(lines[0].removeprefix("event: "), json.loads(lines[1].removeprefix("data: ")))
+            for block in response.text.strip().split("\n\n") if (lines := block.splitlines())]
+
+
+def read_stream(response, payload, *, replay=False):
+    assert response.status_code == 200, response.status_code
+    assert response.headers["content-type"].startswith("text/event-stream")
+    frames = frame_data(response)
+    names = [name for name, _ in frames]
+    meta, done = frames[0][1], frames[-1][1]
+    count = len(payload["reviews"])
+    expected = ["meta", *(["result"] * count), "done"]
+    assert [name for name in names if name != "heartbeat"] == (
+        expected if replay else ["meta", "progress", *expected[1:]]), names
+    if replay:
+        assert "heartbeat" not in names
+    from app.contracts.data_ai_v2 import v2_versions
+    assert all(meta[name] == value for name, value in v2_versions().items())
+    assert done["result_count"] == meta["review_count"] == count
+    job_id = response.headers["X-Analysis-Job-ID"]
+    assert job_id == meta["ai_job_id"] == done["ai_job_id"]
+    assert all(row["request_id"] == response.headers["X-Request-ID"] for _, row in frames)
+    results = [{k: value for k, value in row.items() if k != "request_id"} for name, row in frames if name == "result"]
+    assert [row["review_id"] for row in results] == [row["review_id"] for row in payload["reviews"]]
+    assert all(row["text_score"] >= 0 and "rti" not in row for row in results)
+    return {"job_id": job_id, "results": results, "versions": v2_versions()}
+
+
+def expanded(payload):
+    return {**payload, "reviews": [
+        {**row, "review_id": f"{row['review_id']}-{i}"}
+        for i in range(8) for row in payload["reviews"]
+    ]}
+
+
+def container_smoke(payload, port, *, prior=None):
     import httpx
 
-    port = 18317 if workers == 1 else 28317
-    name = f"review-ai-v2-smoke-w{workers}-261117"
     origin = f"http://127.0.0.1:{port}"
     cold = perf_counter()
     for _ in range(100):
@@ -161,59 +153,71 @@ def container_smoke(payload, workers):
             pass
         sleep(.25)
     else:
-        raise RuntimeError("Isolated container health did not become ready")
-    warm = perf_counter() - cold
-    end, measurements = Event(), []
+        raise RuntimeError("Isolated v2 container health did not become ready")
+    ready = perf_counter() - cold
 
-    def sample():
-        while not end.is_set():
-            result = subprocess.run(["docker", "stats", "--no-stream", "--format", "{{.MemUsage}}|{{.CPUPerc}}", name],
-                                    capture_output=True, text=True, timeout=8)
-            if result.returncode == 0:
-                measurements.append(result.stdout.strip())
+    def headers(key, trace, *, auth=True):
+        base = {"X-Request-ID": trace, "Idempotency-Key": key}
+        return {**base, "X-Internal-Token": os.environ["V2_INTERNAL_TOKEN"]} if auth else base
 
-    old_payload = {**payload, "reviews": [{k: v for k, v in row.items() if k != "image_count"} for row in payload["reviews"]]}
+    def post(body, key, trace):
+        return httpx.post(origin + V2_PATH, timeout=90, headers=headers(key, trace), json=body)
 
-    def run(version, key):
-        mark = perf_counter()
-        response = httpx.post(f"{origin}/api/v{version}/data/analyze/stream", timeout=90,
-                              headers={"X-Internal-Token": "v2_synthetic_only", "X-Request-ID": "container-fixture",
-                                       "Idempotency-Key": key}, json=old_payload if version == 1 else payload)
-        events = [json.loads(line[6:]) for line in response.text.splitlines() if line.startswith("data: ")]
-        if response.status_code != 200 or "event: done" not in response.text or "event: error" in response.text:
-            raise RuntimeError(f"isolated v{version} returned {response.status_code}, "
-                               f"SSE error codes: {[obj['code'] for obj in events if 'code' in obj]}")
-        rows = [row for row in events if "text_score" in row]
-        assert len(rows) == len(payload["reviews"]) and all(row["text_score"] >= 0 for row in rows)
-        assert all(("policy_index_v3" in row) == (version == 2) for row in rows)
-        return {"version": version, "seconds": perf_counter() - mark, "id": response.headers["X-Analysis-Job-ID"],
-                "scores": [row["text_score"] for row in rows]}
+    def replay_all(jobs):
+        for job in jobs:
+            body = expanded(payload) if job["expanded"] else payload
+            actual = read_stream(post(body, job["key"], "container-replay"), body, replay=True)
+            assert actual == job["verified"]
+        return len(jobs)
 
-    thread = Thread(target=sample, daemon=True)
-    thread.start()
-    try:
-        key = uuid4().hex
-        assert httpx.post(f"{origin}/api/v2/data/analyze/stream", json=payload,
-                          headers={"X-Request-ID": "container-fixture", "Idempotency-Key": key}).status_code == 401
-        jobs = [(version, job_key) for job_key in (key, uuid4().hex) for version in (1, 2)]
-        with ThreadPoolExecutor(max_workers=4) as pool:
-            measured = list(pool.map(lambda job: run(*job), jobs))
-        assert measured[0]["scores"] != measured[1]["scores"]
-        assert all(run(i + 1, key)["id"] == measured[i]["id"] for i in range(2))
-    finally:
-        end.set()
-        thread.join(timeout=9)
-    return {"workers": workers, "caps": {"cpus": 2, "memory_gib": 4}, "health_poll_seconds": warm,
-            "parallel_requests": measured, "stats_samples": measurements}
+    if prior is not None:
+        return {"health_poll_seconds": ready, "replayed_after_recreate": replay_all(prior["jobs"])}
+
+    key = uuid4().hex
+    assert httpx.post(origin + V2_PATH, json=payload, headers=headers(key, "no-auth", auth=False)).status_code == 401
+    paths = httpx.get(origin + "/openapi.json").json()["paths"]
+    assert V2_PATH in paths and "/api/v1/data/analyze/stream" not in paths
+
+    # Keep the first stream open; its cold/large inference gives time for a duplicate at HTTP level.
+    large = expanded(payload)
+    with httpx.stream("POST", origin + V2_PATH, timeout=90, headers=headers(key, "overlap"), json=large) as first:
+        assert first.status_code == 200 and next(first.iter_lines()) == "event: meta"
+        duplicate = post(large, key, "duplicate")
+        assert duplicate.status_code == 409 and duplicate.json()["detail"]["code"] == "IDEMPOTENCY_IN_PROGRESS"
+        changed = post(payload, key, "changed")
+        assert changed.status_code == 409 and changed.json()["detail"]["code"] == "IDEMPOTENCY_KEY_REUSED"
+        # Intentionally disconnect before reading result/done, then replay the durable result.
+        original_job = first.headers["X-Analysis-Job-ID"]
+    for _ in range(180):
+        replay = post(large, key, "after-disconnect")
+        if replay.status_code != 409:
+            break
+        assert replay.json()["detail"]["code"] == "IDEMPOTENCY_IN_PROGRESS"
+        sleep(.25)
+    else:
+        raise RuntimeError("Interrupted stream did not complete")
+    recovered = read_stream(replay, large, replay=True)
+    assert recovered["job_id"] == original_job
+
+    def run(key):
+        response = post(payload, key, "container-fresh")
+        return {"key": key, "expanded": False, "verified": read_stream(response, payload)}
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        jobs = list(pool.map(run, (uuid4().hex, uuid4().hex)))
+    assert jobs[0]["verified"]["results"] == jobs[1]["verified"]["results"]
+    jobs.append({"key": key, "expanded": True, "verified": recovered})
+    return {"health_poll_seconds": ready, "concurrent_fresh": 2, "overlap_reviews": len(large["reviews"]),
+            "disconnected_and_replayed": True, "replay_count": replay_all(jobs), "jobs": jobs}
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--mode", choices=("model-v1", "model-v2", "streams", "live-four", "live-twelve", "container-smoke"), required=True)
+    parser.add_argument("--mode", choices=("model-v1", "model-v2", "streams", "live-four", "live-twelve", "container-smoke", "container-replay"), required=True)
     parser.add_argument("--fixture", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--prior", type=Path)
-    parser.add_argument("--workers", type=int, choices=(1, 2), default=1)
+    parser.add_argument("--port", type=int, default=8001)
     args = parser.parse_args()
     if args.output.resolve().parent != LOCAL_OUTPUT or args.output.suffix != ".json" or args.output.exists():
         parser.error("New ignored JSON only")
@@ -226,13 +230,17 @@ def main():
             parser.error("Do not run the second batch before stage 1 success and a full rate window")
     payload = fixture_payload(args.fixture, four=args.mode == "live-four")
     os.environ.update(HF_HUB_OFFLINE="1", TRANSFORMERS_OFFLINE="1", TOKENIZERS_PARALLELISM="false")
-    if args.mode != "container-smoke":
+    if not args.mode.startswith("container-"):
         import torch
 
         torch.set_num_threads(1)
         torch.set_num_interop_threads(1)
     if args.mode == "container-smoke":
-        report = container_smoke(payload, args.workers)
+        report = container_smoke(payload, args.port)
+    elif args.mode == "container-replay":
+        if not args.prior:
+            parser.error("--prior must name the container-smoke JSON")
+        report = container_smoke(payload, args.port, prior=json.loads(args.prior.read_text(encoding="utf-8")))
     elif args.mode == "streams":
         report = streams(payload)
     elif args.mode.startswith("model-"):

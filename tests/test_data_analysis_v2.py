@@ -1,7 +1,6 @@
 """V2 SSE contract, version isolation, persistence, and fallback; no external Groq."""
 
 import json
-import os
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
 from time import sleep
@@ -12,14 +11,14 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.analyzers.p_text import unavailable_result
-from app.contracts.data_ai_v2 import DataAnalyzeRequestV2
+from app.contracts.data_ai_v2 import DataAnalyzeRequestV2, v2_versions
 from app.factory import create_app
 from app.integrations.groq_v2_summary import V2GroqSummary, verified_paragraph
 from app.repositories.analysis_jobs import SQLiteJobStore
-from app.repositories.mysql_jobs import MySQLJobStore
-from app.repositories.v2_job_migration import migrate_v2_schema
+from app.repositories.v2_file_jobs import FileV2JobStore, V2Job
 from app.services import analysis, data_analysis_v2
 from app.services import data_analysis_stream
+from app.v2_server import create_v2_app
 
 
 V1 = "/api/v1/data/analyze/stream"
@@ -48,9 +47,7 @@ def env(monkeypatch):
 
 @pytest.fixture
 def stores(tmp_path, env):
-    v1, v2 = (SQLiteJobStore(str(tmp_path / file)) for file in ("v1.sqlite", "v2.sqlite"))
-    v2.initialize()
-    return v1, v2
+    return SQLiteJobStore(str(tmp_path / "v1.sqlite")), FileV2JobStore(tmp_path / "v2")
 
 
 def test_v2_disabled_by_default(stores, monkeypatch):
@@ -124,8 +121,11 @@ def assert_parallel_streams(stores, monkeypatch):
         assert "세 조건이 함께" in new["result"]["analysis_summary_ko"]
         assert new["done"]["result_count"] == 1
         old_id, new_id = (r.headers["X-Analysis-Job-ID"] for r in (a, b))
-        assert old_id != new_id and v2.get(old_id) is None and v1.get(new_id) is None
-        assert v2.get(new_id)["result"]["results"] == [{k: v for k, v in new["result"].items() if k != "request_id"}]
+        assert old_id != new_id and v1.get(new_id) is None
+        with v2.claim(headers["Idempotency-Key"], DataAnalyzeRequestV2.model_validate(richer).model_dump(mode="json"),
+                      v2_versions()) as cached:
+            assert not cached.claim.is_new and cached.claim.job_id == new_id
+            assert cached.result["results"] == [{k: v for k, v in new["result"].items() if k != "request_id"}]
         for route, payload, expected in [(V1, BODY, old["result"]), (V2, richer, new["result"])]:
             replay = events(c.post(route, json=payload, headers=headers))
             assert [name for name, _ in replay] == ["meta", "result", "done"] and dict(replay)["result"] == expected
@@ -133,21 +133,30 @@ def assert_parallel_streams(stores, monkeypatch):
         assert c.post(V2, json=BODY, headers=headers).json()["detail"]["code"] == "IDEMPOTENCY_KEY_REUSED"
 
 
-def test_sqlite_stream_parallel_versions_and_replay(stores, monkeypatch):
+def test_v1_sqlite_and_v2_files_parallel_versions_and_replay(stores, monkeypatch):
     assert_parallel_streams(stores, monkeypatch)
 
 
-@pytest.mark.skipif(os.getenv("RUN_MYSQL_TESTS") != "1", reason="Disposable MySQL required")
-def test_mysql_migration_parallel_versions_and_replay(env, monkeypatch):
-    v1, v2 = MySQLJobStore.from_env(), MySQLJobStore.from_env(scope="v2")
-    v1.initialize()
-    old_id = v1.create({"seed": "synthetic v1"})
-    v1.complete(old_id, {"seed": "unchanged"})
-    before = v1.get(old_id)
-    migrate_v2_schema(v2)
-    assert_parallel_streams((v1, v2), monkeypatch)
-    migrate_v2_schema(v2)
-    assert v1.get(old_id) == before and v2.get(old_id) is None
+def test_standalone_v2_replay_after_restart_without_mysql(tmp_path, monkeypatch, env):
+    def forbidden(*args, **kwargs):
+        pytest.fail("A v2 replay must not initialize MySQL or rerun the model")
+
+    monkeypatch.setenv("V2_JOB_DIR", str(tmp_path / "replay"))
+    monkeypatch.delenv("DB_PASSWORD", raising=False)
+    monkeypatch.setattr("app.repositories.mysql_jobs.MySQLJobStore.from_env", forbidden)
+    monkeypatch.setattr(data_analysis_v2, "predict_v31b", lambda _: [prediction(53)])
+    with TestClient(create_v2_app()) as client:
+        assert V1 not in client.get("/openapi.json").json()["paths"]
+        fresh = client.post(V2, json=BODY, headers=HEADERS)
+        assert [name for name, _ in events(fresh)] == ["meta", "progress", "result", "done"]
+    monkeypatch.setattr(data_analysis_v2, "predict_v31b", forbidden)
+    with TestClient(create_v2_app()) as client:
+        replay = client.post(V2, json=BODY, headers={**HEADERS, "X-Request-ID": "replay"})
+        frames = events(replay)
+        assert [name for name, _ in frames] == ["meta", "result", "done"]
+        assert all(row["request_id"] == "replay" for _, row in frames)
+        assert replay.headers["X-Analysis-Job-ID"] == fresh.headers["X-Analysis-Job-ID"]
+        assert dict(frames)["result"] == {**dict(events(fresh))["result"], "request_id": "replay"}
 
 
 def test_v2_model_failure_keeps_v1_healthy(stores, monkeypatch):
@@ -174,13 +183,14 @@ def test_v2_heartbeat_and_no_result_on_commit_failure(stores, monkeypatch):
 
     monkeypatch.setattr(data_analysis_v2, "predict_v31b", predict)
     monkeypatch.setattr(data_analysis_stream, "HEARTBEAT_SECONDS", .01)
-    monkeypatch.setattr(stores[1], "complete", no_commit)
+    monkeypatch.setattr(V2Job, "complete", no_commit)
     with TestClient(create_app(job_store=stores[0], v2_job_store=stores[1])) as client:
         response = client.post(V2, headers=HEADERS, json=BODY)
         names = [name for name, _ in events(response)]
         assert names[:2] == ["meta", "progress"] and names[-1] == "error" and "heartbeat" in names
         assert "done" not in names and "result" not in names
-        assert stores[1].get(response.headers["X-Analysis-Job-ID"])["status"] == "FAILED"
+        snapshot = json.loads(next(stores[1].root.glob("*.json")).read_text(encoding="utf-8"))
+        assert snapshot["status"] == "RUNNING" and "result" not in snapshot
 
 
 @pytest.mark.parametrize("mutation", ["rating", "absence", "add", "omit", "reorder", "invent"])

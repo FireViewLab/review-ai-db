@@ -11,7 +11,8 @@
 
 - [Data AI v2 SSE 계약](data-ai-v2-integration.md)과 [Data 서버 인수인계](data-ai-v2-data-server-handoff.md)
 - [GCP v1/v2 병행 운영 준비 및 롤백](ai-v1-v2-gcp-deployment.md)
-- [v1/v2 실제 모델·격리 MySQL·Docker 검증](validation/ai-v1-v2-20261117.md)
+- [v2 파일 저장·실제 모델·SSE 검증](validation/ai-v2-file-jobs-20261119.md)
+- [v1/v2 실제 모델·Docker 초기 검증 기록](validation/ai-v1-v2-20261117.md) (과거 v2 MySQL 설계)
 
 이 문서들은 `feat/ai-v3-candidate-integration`의 기본 OFF 기능을 설명합니다. 기존 v0.5 운영 계약을 대체하지 않습니다.
 
