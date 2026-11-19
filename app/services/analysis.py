@@ -19,11 +19,12 @@ analyzer 내부에 넣지 않는다. 실제 원천 데이터에 없는 값도 �
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Literal, Sequence
+from typing import Callable, Literal, Sequence
 
 from app.analyzers.p_text import predict_text_scores
 from app.analyzers.behavior import BehaviorInput, analyze_behavior
 from app.analyzers.network import (
+    NetworkAnalysisResult,
     NetworkReview,
     SimilarityAdapter,
     analyze_network,
@@ -104,6 +105,8 @@ def analyze_product_reviews(
     *,
     sentiment_analyzer: SentimentAnalyzer | None = None,
     similarity_adapter: SimilarityAdapter | None = None,
+    text_predictor: Callable[[list[str]], list[dict]] | None = None,
+    observe_signals: Callable[[str, dict, NetworkAnalysisResult], None] | None = None,
 ) -> tuple[ReviewAnalysisResult, ...]:
     """동일 상품 리뷰를 입력 순서대로 분석해 리뷰별 최종 결과를 반환한다."""
 
@@ -124,7 +127,9 @@ def analyze_product_reviews(
         similarity_adapter, NormalizedTextSimilarityAdapter,
     )
     batch_network = analyze_network_batch(network_reviews) if use_runtime_batch else None
-    predictions = predict_text_scores([review.content for review in reviews])
+    # Production callers use the same v1 tensor batch. Local experiments may supply
+    # their own predictions and observe the real Network features without rescoring.
+    predictions = (text_predictor or predict_text_scores)([review.content for review in reviews])
     for index, (review, network_target, prediction) in enumerate(
         zip(reviews, network_reviews, predictions, strict=True)
     ):
@@ -152,6 +157,8 @@ def analyze_product_reviews(
             comparisons if isinstance(review.content, str) and review.content.strip() else (),
             similarity_adapter=similarity_adapter,
         )
+        if observe_signals is not None:
+            observe_signals(review.review_id, prediction, network_result)
 
         signals = AnalysisSignals(
             text=AnalysisSignal(available=prediction["text_score"] != -1,

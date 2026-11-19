@@ -11,11 +11,11 @@ from app.services.data_analysis import evaluate_data_and_store
 HEARTBEAT_SECONDS = 15.0
 
 
-def saved_result(store, job_id, payload):
+def saved_result(store, job_id, payload, *, result_type=DataAnalyzeResponseV05):
     job = store.get(job_id)
     if job is None or job["status"] != "DONE":
         raise ValueError("Stored analysis unavailable")
-    result = DataAnalyzeResponseV05.model_validate(job["result"])
+    result = result_type.model_validate(job["result"])
     ids = [review.review_id for review in payload.reviews]
     by_id = {review.review_id: review for review in result.results}
     if (result.platform != payload.platform or result.product_id != payload.product_id
@@ -29,8 +29,8 @@ def analyze_and_read(store, job_id, payload):
     return saved_result(store, job_id, payload)
 
 
-def start_analysis(tasks, store, job_id, payload):
-    task = asyncio.create_task(run_in_threadpool(analyze_and_read, store, job_id, payload))
+def start_analysis(tasks, store, job_id, payload, *, runner=None):
+    task = asyncio.create_task(run_in_threadpool(runner or analyze_and_read, store, job_id, payload))
     tasks.add(task)
 
     def finished(completed):
@@ -47,7 +47,7 @@ def frame(name, data):
              allow_nan=False, separators=(",", ":")) + "\n\n").encode("utf-8")
 
 
-async def analysis_events(*, request_id, claim, payload, task=None, replay=None):
+async def analysis_events(*, request_id, claim, payload, task=None, replay=None, error_code=None):
     context = dict(request_id=request_id, ai_job_id=claim.job_id)
     yield frame("meta", {**context, "platform": payload.platform,
                          "product_id": payload.product_id,
@@ -68,8 +68,8 @@ async def analysis_events(*, request_id, claim, payload, task=None, replay=None)
             yield frame("result", {**result, "request_id": request_id})
             count += 1
         yield frame("done", {**context, "result_count": count})
-    except Exception:
-        yield frame("error", {**context, "code": "ANALYSIS_FAILED",
+    except Exception as exc:
+        yield frame("error", {**context, "code": error_code(exc) if error_code else "ANALYSIS_FAILED",
                               "message": "분석 결과를 제공하지 못했습니다. 작업 상태 확인이 필요합니다.",
                               "retryable": False})
     # No cancellation of task: persistence must continue after stream disconnect.

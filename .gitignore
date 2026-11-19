@@ -14,6 +14,7 @@ data/raw/*.txt
 
 # Converted / generated review outputs
 data/converted/
+data/v2-jobs/
 
 # Local databases and generated analysis results
 *.db
@@ -22,6 +23,8 @@ data/converted/
 *.db-shm
 output/*.json
 !output/*_sample.json
+output/ai-v3-groq-*.md
+output/review-ai-v2-*.md
 
 # Temporary / broken files
 *broken*

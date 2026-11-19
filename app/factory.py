@@ -16,9 +16,10 @@ from app.api.data_analysis_stream import router as data_stream_router
 from app.core.internal_auth import load_internal_token
 
 
-def create_app(*, job_store=None) -> FastAPI:
+def create_app(*, job_store=None, v2_job_store=None, v2_groq=None) -> FastAPI:
     load_dotenv()
     experimental = os.getenv("ENABLE_EXPERIMENTAL_COLLECTION", "0") == "1"
+    v2 = os.getenv("ENABLE_DATA_AI_V2", "0") == "1"
 
     @asynccontextmanager
     async def lifespan(app):
@@ -27,6 +28,13 @@ def create_app(*, job_store=None) -> FastAPI:
         store.initialize()
         app.state.job_store = store
         app.state.analysis_tasks = set()
+        if v2:
+            from app.integrations.groq_v2_summary import V2GroqSummary
+            from app.repositories.v2_file_jobs import FileV2JobStore
+
+            # Optional local mode; production's opt-in v2 sidecar never starts this v1 factory.
+            app.state.v2_job_store = v2_job_store if v2_job_store is not None else FileV2JobStore.from_env()
+            app.state.v2_groq = v2_groq if v2_groq is not None else V2GroqSummary.from_env()
         crawler = None
         if experimental:
             from app.integrations.crawler_stream import CrawlerStreamClient
@@ -48,6 +56,10 @@ def create_app(*, job_store=None) -> FastAPI:
     application.include_router(router)
     application.include_router(data_router)
     application.include_router(data_stream_router)
+    if v2:
+        from app.api.data_analysis_v2 import router as v2_router
+
+        application.include_router(v2_router)
     if experimental:
         from app.api.collection import router as collection_router
         application.include_router(collection_router)
