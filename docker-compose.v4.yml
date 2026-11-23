@@ -1,0 +1,35 @@
+# P_text v4.0 단독 서비스. v1(docker-compose.yml)·v2와 함께 지정하지 않는다.
+# 실행: docker compose -p review-ai-v4 --env-file .env.v4 -f docker-compose.v4.yml up -d --build ai-v4
+name: review-ai-v4
+services:
+  ai-v4:
+    image: review-ai-v4:latest
+    build: .
+    command: ["uvicorn", "app.v4_server:app", "--host", "0.0.0.0", "--port", "8000", "--timeout-graceful-shutdown", "60", "--no-access-log"]
+    init: true
+    restart: unless-stopped
+    cpus: "${V4_CPUS:-2.0}"
+    mem_limit: "${V4_MEMORY_LIMIT:-2g}"
+    ports:
+      - "127.0.0.1:${V4_HOST_PORT:-8002}:8000"
+    environment:
+      REQUIRE_INTERNAL_TOKEN: "1"
+      INTERNAL_TOKEN: ${V4_INTERNAL_TOKEN:-}
+      PTEXT_V4_MODEL_PATH: /models/ptext-koelectra-v4.0
+      PTEXT_V4_BATCH_SIZE: ${V4_BATCH_SIZE:-16}
+      OMP_NUM_THREADS: ${V4_OMP_NUM_THREADS:-2}
+      MKL_NUM_THREADS: ${V4_OMP_NUM_THREADS:-2}
+      CUDA_VISIBLE_DEVICES: ""
+    volumes:
+      - type: bind
+        source: ${PTEXT_V4_MODEL_HOST_PATH:-/opt/review-ai-models/ptext-koelectra-v4.0}
+        target: /models/ptext-koelectra-v4.0
+        read_only: true
+        bind:
+          create_host_path: false
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 90s
+      retries: 3
