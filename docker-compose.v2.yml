@@ -21,6 +21,8 @@ services:
       MKL_NUM_THREADS: ${V2_OMP_NUM_THREADS:-1}
       PTEXT_BATCH_SIZE: ${V2_PTEXT_BATCH_SIZE:-8}
       PTEXT_V31B_MODEL_PATH: /models/ptext-koelectra-v3.1-b
+      # v4.0 텍스트 모델(선택). 비우면 /v4/analyze는 503을 돌려준다.
+      PTEXT_V4_MODEL_PATH: ${PTEXT_V4_MODEL_PATH:-}
       CUDA_VISIBLE_DEVICES: ""
       V2_JOB_DIR: /service/data/v2-jobs
       ENABLE_V2_GROQ_SUMMARY: ${ENABLE_V2_GROQ_SUMMARY:-0}
@@ -34,6 +36,12 @@ services:
         read_only: true
         bind:
           create_host_path: false
+      - type: bind
+        source: ${PTEXT_V4_MODEL_HOST_PATH:-/opt/review-ai-models/ptext-koelectra-v4.0}
+        target: /models/ptext-koelectra-v4.0
+        read_only: true
+        bind:
+          create_host_path: true
       - v2-job-data:/service/data
 volumes:
   v2-job-data:
