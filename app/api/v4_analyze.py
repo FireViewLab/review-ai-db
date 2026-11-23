@@ -1,4 +1,4 @@
-"""P_text v4.0 분석 API. Data 서버가 v3.1(v2 SSE) 결과를 저장한 뒤 같은 리뷰로 호출한다."""
+"""P_text v4.0 분석 API. Data 서버의 분석 워커가 상품 단위로 호출한다."""
 
 from dataclasses import asdict
 
@@ -37,7 +37,7 @@ class AnalyzeV4Response(BaseModel):
     results: list[ReviewOut]
 
 
-router = APIRouter(tags=["Data AI v4"], dependencies=[Depends(require_internal_token)])
+router = APIRouter(tags=["Data AI v4"])
 
 
 def _predictor(request: Request):
@@ -47,13 +47,14 @@ def _predictor(request: Request):
     return predictor
 
 
-@router.get("/v4/health")
-def health_v4(request: Request) -> dict:
+@router.get("/health")
+def health(request: Request) -> dict:
+    """모델·규칙 버전. 비밀 값이 없어 토큰 없이 연다(Data 상태 화면이 호출한다)."""
     predictor = _predictor(request)
     return {"status": "ok", "model_version": predictor.model_version, "policy_version": predictor.policy.version}
 
 
-@router.post("/v4/analyze", response_model=AnalyzeV4Response)
+@router.post("/v4/analyze", response_model=AnalyzeV4Response, dependencies=[Depends(require_internal_token)])
 def analyze_v4(body: AnalyzeV4Request, request: Request) -> AnalyzeV4Response:
     predictor = _predictor(request)
     ids = [r.review_id for r in body.reviews]

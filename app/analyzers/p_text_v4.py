@@ -86,7 +86,7 @@ class V4Predictor:
         ]
 
     @classmethod
-    def from_model_dir(cls, model_dir: str | Path, *, batch_size: int = 32) -> "V4Predictor":
+    def from_model_dir(cls, model_dir: str | Path, *, batch_size: int = 16) -> "V4Predictor":
         import torch
         from transformers import AutoModelForSequenceClassification, AutoTokenizer
 

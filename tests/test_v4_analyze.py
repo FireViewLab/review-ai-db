@@ -1,4 +1,4 @@
-"""P_text v4.0 API: 인증, 입력 검증, 등급·지수 변환. 실제 모델 없이 확률 함수를 바꿔 끼운다."""
+"""P_text v4.0 단독 서비스: 인증, 입력 검증, 등급·지수 변환. 실제 모델 없이 확률 함수를 바꿔 끼운다."""
 
 import json
 
@@ -64,9 +64,35 @@ def test_unconfigured_model_returns_503():
     assert make_client().post("/v4/analyze", json=body, headers=HEADERS).status_code == 503
 
 
-def test_health_reports_versions(client):
-    assert client.get("/v4/health", headers=HEADERS).json() == {
+def test_health_is_public_and_reports_versions(client):
+    assert client.get("/health").json() == {
         "status": "ok", "model_version": "ptext-koelectra-v4.0", "policy_version": "text-first-v1"}
+
+
+def test_v4_server_requires_token_and_serves_injected_predictor(monkeypatch):
+    from app.v4_server import create_v4_app
+
+    predictor = V4Predictor(fake_probability, POLICY, "ptext-koelectra-v4.0")
+    monkeypatch.delenv("INTERNAL_TOKEN", raising=False)
+    with pytest.raises(ValueError):
+        with TestClient(create_v4_app(predictor)):
+            pass
+    monkeypatch.setenv("INTERNAL_TOKEN", "synthetic-test")
+    body = {"platform": "k", "product_id": "p", "reviews": [{"review_id": "a", "content": "0.9"}]}
+    with TestClient(create_v4_app(predictor)) as c:
+        assert c.get("/health").status_code == 200
+        assert c.post("/v4/analyze", json=body).status_code == 401
+        assert c.post("/v4/analyze", json=body, headers=HEADERS).json()["results"][0]["level"] == "DANGER"
+
+
+def test_v4_server_requires_model_path(monkeypatch):
+    from app.v4_server import create_v4_app
+
+    monkeypatch.setenv("INTERNAL_TOKEN", "synthetic-test")
+    monkeypatch.delenv("PTEXT_V4_MODEL_PATH", raising=False)
+    with pytest.raises(ValueError):
+        with TestClient(create_v4_app()):
+            pass
 
 
 def test_policy_file_validation(tmp_path):
