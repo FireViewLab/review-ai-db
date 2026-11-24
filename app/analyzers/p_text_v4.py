@@ -101,14 +101,18 @@ class V4Predictor:
         lock = Lock()
 
         def probability(texts: Sequence[str]) -> list[float]:
-            out: list[float] = []
+            # 길이가 비슷한 리뷰끼리 묶어 배치마다 가장 긴 리뷰에 맞춘 패딩 계산을 줄인다.
+            # attention mask로 패딩은 결과에 영향이 없으므로 입력 순서로 되돌리면 값이 같다.
+            ids = tokenizer(list(texts), truncation=True, max_length=max_length)["input_ids"]
+            order = sorted(range(len(texts)), key=lambda i: len(ids[i]))
+            out: list[float] = [0.0] * len(texts)
             with lock, torch.no_grad():
-                for i in range(0, len(texts), batch_size):
-                    enc = tokenizer(list(texts[i:i + batch_size]), truncation=True, max_length=max_length,
-                                    padding=True, return_tensors="pt").to(device)
+                for start in range(0, len(order), batch_size):
+                    chunk = order[start:start + batch_size]
+                    enc = tokenizer.pad({"input_ids": [ids[i] for i in chunk]}, return_tensors="pt").to(device)
                     logits = model(**enc).logits.float().cpu()
-                    for diff in (logits[:, 1] - logits[:, 0]).tolist():
-                        out.append(1 / (1 + math.exp(-diff / temperature)))
+                    for i, diff in zip(chunk, (logits[:, 1] - logits[:, 0]).tolist(), strict=True):
+                        out[i] = 1 / (1 + math.exp(-diff / temperature))
             return out
 
         return cls(probability, policy, str(config.get("model_family", path.name)))
