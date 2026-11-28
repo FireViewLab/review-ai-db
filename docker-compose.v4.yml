@@ -8,6 +8,12 @@ services:
     command: ["uvicorn", "app.v4_server:app", "--host", "0.0.0.0", "--port", "8000", "--timeout-graceful-shutdown", "60", "--no-access-log"]
     init: true
     restart: unless-stopped
+    # 기본 json-file은 크기 제한이 없어 디스크를 채운다. 20MB 파일 5개까지만 남긴다.
+    logging:
+      driver: json-file
+      options:
+        max-size: ${V4_LOG_MAX_SIZE:-20m}
+        max-file: ${V4_LOG_MAX_FILE:-5}
     cpus: "${V4_CPUS:-2.0}"
     mem_limit: "${V4_MEMORY_LIMIT:-2g}"
     ports:
